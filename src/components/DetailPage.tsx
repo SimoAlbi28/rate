@@ -116,120 +116,56 @@ export default function DetailPage({ financings, onUpdate }: Props) {
       </div>
 
       <div className="content">
-        {/* IMPOSTAZIONI */}
-        <div className="card section-card">
-          <div className="section-heading-row">
-            <h3 className="section-heading">⚙️ IMPOSTAZIONI</h3>
-            {!editingSettings && (
-              <button
-                className="card-action-btn"
-                onClick={() => setEditingSettings(true)}
-                title="Modifica"
-              >
-                ✏️
-              </button>
-            )}
-          </div>
-          {editingSettings ? (
-            <>
-              <p className="modal-field-label">Importo totale</p>
-              <div className="amount-row">
-                <input
-                  type="number"
-                  placeholder="Euro"
-                  value={editAmountInt}
-                  onChange={(e) => setEditAmountInt(e.target.value)}
-                />
-                <span className="amount-sep">,</span>
-                <input
-                  type="number"
-                  placeholder="Cent"
-                  value={editAmountDec}
-                  onChange={(e) => setEditAmountDec(e.target.value.slice(0, 2))}
-                  className="amount-dec"
-                />
-                <span className="amount-currency">€</span>
-              </div>
-              <p className="modal-field-label">Durata</p>
-              <div className="duration-row">
-                <select
-                  className="duration-select"
-                  value={editDurationType}
-                  onChange={(e) => setEditDurationType(e.target.value as 'mesi' | 'anni')}
-                >
-                  <option value="mesi">Mesi</option>
-                  <option value="anni">Anni</option>
-                </select>
-                <input
-                  type="number"
-                  placeholder="Durata"
-                  value={editDuration}
-                  onChange={(e) => setEditDuration(e.target.value)}
-                />
-              </div>
-              <div className="settings-edit-actions">
-                <button
-                  className="card-action-btn card-btn-confirm"
-                  onClick={() => {
-                    saveSettings();
-                    setEditingSettings(false);
-                  }}
-                  title="Conferma"
-                >
-                  ✓
-                </button>
-                <button
-                  className="card-action-btn card-btn-cancel"
-                  onClick={() => {
-                    resetSettings();
-                    setEditingSettings(false);
-                  }}
-                  title="Annulla"
-                >
-                  ←
-                </button>
-              </div>
-            </>
-          ) : (
-            <div className="settings-display">
-              <div className="settings-display-row">
-                <span>Importo totale:</span>
-                <span>{financing.totalAmount.toFixed(2)} €</span>
-              </div>
-              <div className="settings-display-row">
-                <span>Durata:</span>
-                <span>{financing.totalMonths} mesi</span>
-              </div>
-            </div>
-          )}
-        </div>
-
         {/* RIEPILOGO */}
         <div className="card section-card">
           <h3 className="section-heading">📊 RIEPILOGO</h3>
           <div className="summary-grid">
-            <div className="summary-box highlight">
-              <span className="summary-label">TOTALE</span>
-              <span className="summary-value">{financing.totalAmount} €</span>
+            <div className="summary-column">
+              <div className="summary-box highlight">
+                <span className="summary-label">TOTALE</span>
+                <span className="summary-value">{financing.totalAmount.toFixed(2)} €</span>
+              </div>
+              <div className="summary-box">
+                <span className="summary-label">PAGATO</span>
+                <span className="summary-value" style={{ color: '#27ae60' }}>{paid.toFixed(2)} €</span>
+              </div>
+              <div className="summary-box">
+                <span className="summary-label">RESTANTE</span>
+                <span className="summary-value" style={{ color: '#d4a017' }}>{Math.max(residuo, 0).toFixed(2)} €</span>
+              </div>
             </div>
-            <div className="summary-box">
-              <span className="summary-label">MESI RIMANENTI</span>
-              <span className="summary-value">{Math.max(remainingMonths, 0)}</span>
-              <span className="summary-sub">su {financing.totalMonths} totali</span>
-            </div>
-          </div>
-          <div className="summary-grid three">
-            <div className="summary-box">
-              <span className="summary-label">PAGATO</span>
-              <span className="summary-value">{paid} €</span>
-            </div>
-            <div className="summary-box">
-              <span className="summary-label">RESIDUO</span>
-              <span className="summary-value red">{Math.max(residuo, 0)} €</span>
-            </div>
-            <div className="summary-box">
-              <span className="summary-label">RATE</span>
-              <span className="summary-value">{ratesPaid}</span>
+            <div className="summary-column">
+              <div className="summary-box">
+                <span className="summary-label">RATE RIMANENTI</span>
+                <span className="summary-value">{Math.max(remainingMonths, 0)}</span>
+                <span className="summary-sub">su {financing.totalMonths} rate totali</span>
+              </div>
+              <div className="summary-box">
+                <span className="summary-label">RATE PAGATE</span>
+                <span className="summary-value">{ratesPaid}</span>
+              </div>
+              {(financing.rateMode || 'variabile') === 'fissa' && rateAmount > 0 && (
+                <div className="summary-box">
+                  <span className="summary-label">RATA SINGOLA</span>
+                  <span className="summary-value" style={{ color: '#8e44ad' }}>{rateAmount.toFixed(2)} €</span>
+                </div>
+              )}
+              {(financing.rateMode || 'variabile') === 'fissa' && (() => {
+                const irregulars = financing.payments.filter(p => p.amount !== rateAmount);
+                if (irregulars.length === 0) return null;
+                const balance = irregulars.reduce((sum, p) => sum + (p.amount - rateAmount), 0);
+                const label = balance === 0 ? 'Pareggio' : balance > 0 ? 'Credito' : 'Debito';
+                const color = balance === 0 ? '#27ae60' : balance > 0 ? '#5dade2' : '#c0392b';
+                return (
+                  <div className="summary-box" style={{ borderColor: color }}>
+                    <span className="summary-label">SITUAZIONE</span>
+                    <span className="summary-value" style={{ color, fontSize: '1.1rem' }}>{label}</span>
+                    {balance !== 0 && (
+                      <span className="summary-sub" style={{ color }}>{balance > 0 ? '+' : '-'}{Math.abs(balance).toFixed(2)} €</span>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           </div>
           <div className="progress-section">

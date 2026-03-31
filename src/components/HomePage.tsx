@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Financing, RateType } from '../types';
 
@@ -20,6 +20,9 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
   const [showModal, setShowModal] = useState(false);
   const [showAllEmojis, setShowAllEmojis] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterType, setFilterType] = useState<'tutti' | 'debito' | 'credito'>('tutti');
   const [errors, setErrors] = useState<Set<string>>(new Set());
   const nameRef = useRef<HTMLInputElement>(null);
   const amountRef = useRef<HTMLInputElement>(null);
@@ -40,6 +43,7 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
   const [quickPayOriginal, setQuickPayOriginal] = useState('');
   const [quickPayNote, setQuickPayNote] = useState('');
   const [shortPayDetail, setShortPayDetail] = useState<string | null>(null);
+  const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
   const [editId, setEditId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editEmoji, setEditEmoji] = useState('');
@@ -63,15 +67,15 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
   const [selectedEmoji, setSelectedEmoji] = useState('💰');
   const [amountInt, setAmountInt] = useState('');
   const [amountDec, setAmountDec] = useState('');
-  const [newDuration, setNewDuration] = useState('');
+  const [newDuration, setNewDuration] = useState('0');
   const [durationType, setDurationType] = useState<'mesi' | 'anni'>('mesi');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [rateType, setRateType] = useState<RateType | ''>('');
-  const [rateMode, setRateMode] = useState<'fissa' | 'variabile' | ''>('');
+  const [rateType, setRateType] = useState<RateType | ''>('mensile');
+  const [rateMode, setRateMode] = useState<'fissa' | 'variabile' | ''>('fissa');
   const [fixedRateInt, setFixedRateInt] = useState('');
   const [fixedRateDec, setFixedRateDec] = useState('');
-  const [initialPaidRates, setInitialPaidRates] = useState('');
+  const [initialPaidRates, setInitialPaidRates] = useState('0');
   const [paidMode, setPaidMode] = useState<'singola' | 'totale'>('totale');
   const [paidSlideDir, setPaidSlideDir] = useState<'slide-left' | 'slide-right'>('slide-right');
   const [singleRates, setSingleRates] = useState<{ int: string; dec: string }[]>([]);
@@ -234,6 +238,62 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
     }
   };
 
+  const getBalance = (f: Financing) => {
+    const ra = f.totalMonths > 0 ? f.totalAmount / f.totalMonths : 0;
+    if ((f.rateMode || 'variabile') !== 'fissa' || ra <= 0) return 0;
+    const irregulars = f.payments.filter(p => p.amount !== ra);
+    return irregulars.reduce((sum, p) => sum + (p.amount - ra), 0);
+  };
+
+  const filteredFinancings = financings
+    .filter(f => {
+      if (searchQuery && !f.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+      if (filterType === 'debito') return getBalance(f) < 0;
+      if (filterType === 'credito') return getBalance(f) > 0;
+      return true;
+    })
+    .sort((a, b) => {
+      if (filterType === 'debito') return getBalance(a) - getBalance(b);
+      if (filterType === 'credito') return getBalance(b) - getBalance(a);
+      return a.name.localeCompare(b.name);
+    });
+
+  const lpTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lpInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lpCounter = useRef(0);
+  const lpActive = useRef(false);
+
+  const lpStart = (initial: number, step: number, min: number, onChange: (v: string) => void) => {
+    lpCounter.current = initial;
+    lpActive.current = false;
+    lpTimeout.current = setTimeout(() => {
+      lpActive.current = true;
+      lpInterval.current = setInterval(() => {
+        lpCounter.current = Math.max(min, lpCounter.current + step);
+        onChange(String(lpCounter.current));
+      }, 120);
+    }, 500);
+  };
+
+  const lpStop = () => {
+    if (lpTimeout.current) { clearTimeout(lpTimeout.current); lpTimeout.current = null; }
+    if (lpInterval.current) { clearInterval(lpInterval.current); lpInterval.current = null; }
+  };
+
+  useEffect(() => () => lpStop(), []);
+
+  const stepperMinus = (getVal: () => number, onChange: (v: string) => void, min = 0) => ({
+    onPointerDown: (e: React.PointerEvent) => { e.preventDefault(); lpStart(getVal(), -1, min, onChange); },
+    onPointerUp: () => { if (!lpActive.current) onChange(String(Math.max(min, (lpCounter.current) - 1))); lpStop(); },
+    onPointerLeave: () => lpStop(),
+  });
+
+  const stepperPlus = (getVal: () => number, onChange: (v: string) => void) => ({
+    onPointerDown: (e: React.PointerEvent) => { e.preventDefault(); lpStart(getVal(), 1, 0, onChange); },
+    onPointerUp: () => { if (!lpActive.current) onChange(String((lpCounter.current) + 1)); lpStop(); },
+    onPointerLeave: () => lpStop(),
+  });
+
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 2500);
@@ -371,13 +431,13 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
     setSelectedEmoji('💳');
     setAmountInt('');
     setAmountDec('');
-    setNewDuration('');
+    setNewDuration('0');
     setDurationType('mesi');
-    setRateType('');
-    setRateMode('');
+    setRateType('mensile');
+    setRateMode('fissa');
     setFixedRateInt('');
     setFixedRateDec('');
-    setInitialPaidRates('');
+    setInitialPaidRates('0');
     setPaidMode('totale');
     setSingleRates([]);
     setStartDate('');
@@ -389,19 +449,66 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
 
   return (
     <div className="page home-page">
-      <div className="header">
-        <div className="header-icon">💰</div>
-        <div className="header-center">
-          <h1>Rate & Pagamenti</h1>
-          <p className="header-subtitle">RIPRENDI IL CONTROLLO</p>
+      <div className="home-sticky-top">
+        <div className="header">
+          <div className="header-icon">💰</div>
+          <div className="header-center">
+            <h1>Rate & Pagamenti</h1>
+            <p className="header-subtitle">RIPRENDI IL CONTROLLO</p>
+          </div>
+          <div className="header-icon">💰</div>
         </div>
-        <div className="header-icon">💰</div>
+        <div className="sticky-bar">
+          <h2 className="section-title">CARTELLE</h2>
+          <div className="toolbar">
+            <button className="toolbar-btn toolbar-btn-create" onClick={() => setShowModal(true)}>
+              + Crea
+            </button>
+            <button
+              className={`toolbar-btn toolbar-btn-search ${showSearch ? 'active' : ''}`}
+              onClick={() => { setShowSearch(!showSearch); if (showSearch) { setSearchQuery(''); setFilterType('tutti'); } }}
+            >
+              🔍
+            </button>
+          </div>
+          {showSearch && (
+            <div className="search-bar">
+              <input
+                type="text"
+                placeholder="Cerca per nome..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="search-input"
+                autoFocus
+              />
+              <div className="filter-buttons">
+                <button
+                  className={`filter-btn ${filterType === 'tutti' ? 'active' : ''}`}
+                  onClick={() => setFilterType('tutti')}
+                >
+                  Tutti
+                </button>
+                <button
+                  className={`filter-btn filter-debito ${filterType === 'debito' ? 'active' : ''}`}
+                  onClick={() => setFilterType(filterType === 'debito' ? 'tutti' : 'debito')}
+                >
+                  Debito
+                </button>
+                <button
+                  className={`filter-btn filter-credito ${filterType === 'credito' ? 'active' : ''}`}
+                  onClick={() => setFilterType(filterType === 'credito' ? 'tutti' : 'credito')}
+                >
+                  Credito
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="content">
-        <h2 className="section-title">LE TUE CARTELLE</h2>
         <div className="cards-grid">
-          {financings.map((f) => {
+          {filteredFinancings.map((f) => {
             const paid = f.payments.reduce((s, p) => s + p.amount, 0) + (f.initialPaid || 0);
             const rateAmount = f.totalMonths > 0 ? f.totalAmount / f.totalMonths : 0;
             const ratesPaid = (rateAmount > 0 ? Math.floor(paid / rateAmount) : 0) + (f.initialPaidRates || 0);
@@ -504,7 +611,7 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                         <div className="card-rate-info">
                           {rateAmount.toFixed(2)} € <span className="card-rate-type">{f.rateType.charAt(0).toUpperCase() + f.rateType.slice(1)}</span>
                         </div>
-                        {hasIrregular && (
+                        {hasIrregular && !dismissedAlerts.has(f.id) && (
                           <button
                             className={`short-pay-alert ${isBalanced ? 'no-pulse' : ''}`}
                             onClick={(e) => {
@@ -516,7 +623,7 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                           </button>
                         )}
                       </div>
-                      {shortPayDetail === f.id && hasIrregular && (
+                      {shortPayDetail === f.id && hasIrregular && !dismissedAlerts.has(f.id) && (
                         <div className="short-pay-popup" onClick={(e) => e.stopPropagation()}>
                           <div className="short-pay-header">
                             <span>Rate irregolari</span>
@@ -577,15 +684,12 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                                     className="short-pay-delete-all"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      const irregularIds = new Set(irregularPayments.map(p => p.id));
-                                      onUpdate({
-                                        ...f,
-                                        payments: f.payments.filter(pay => !irregularIds.has(pay.id)),
-                                      });
+                                      setDismissedAlerts(prev => new Set([...prev, f.id]));
                                       setShortPayDetail(null);
                                     }}
                                   >
-                                    Elimina tutto
+                                    Elimina notifiche
+                                    <span className="btn-hint">(Consigliato)</span>
                                   </button>
                                 )}
                               </>
@@ -670,11 +774,6 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
               </div>
             );
           })}
-
-          <div className="card new-card" onClick={() => setShowModal(true)}>
-            <div className="new-card-plus">+</div>
-            <div className="new-card-text">Nuova cartella</div>
-          </div>
         </div>
       </div>
 
@@ -690,7 +789,7 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
             />
-            <p className={`modal-field-label ${errors.has('amount') ? 'label-error' : ''}`}>Totale da pagare <span className="required-tag">*</span></p>
+            <p className={`modal-field-label ${errors.has('amount') ? 'label-error' : ''}`}>Importo totale da pagare <span className="required-tag">*</span></p>
             <div className={`amount-row ${errors.has('amount') ? 'input-error-row' : ''}`}>
               <input
                 ref={amountRef}
@@ -734,47 +833,6 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
               />
               <span className="amount-currency">€</span>
             </div>
-            <p className={`modal-field-label ${errors.has('duration') ? 'label-error' : ''}`}>Durata <span className="required-tag">*</span></p>
-            <div className={`duration-row ${errors.has('duration') ? 'input-error-row' : ''}`}>
-              <select
-                className="duration-select"
-                value={durationType}
-                onChange={(e) => handleDurationTypeChange(e.target.value as 'mesi' | 'anni')}
-              >
-                <option value="mesi">Mesi</option>
-                <option value="anni">Anni</option>
-              </select>
-              <input
-                ref={durationRef}
-                type="number"
-                placeholder="Durata"
-                value={newDuration}
-                onChange={(e) => handleDurationChange(e.target.value)}
-              />
-            </div>
-            {(parseInt(newDuration) || 0) > 0 && (
-              <>
-                <p className="modal-field-label">Periodo <span className="optional-tag">(opzionale)</span></p>
-                <div className="date-row">
-                  <div className="date-field">
-                    <label>Inizio</label>
-                    <input
-                      type="date"
-                      value={startDate}
-                      onChange={(e) => handleStartDateChange(e.target.value)}
-                    />
-                  </div>
-                  <div className="date-field">
-                    <label>Fine</label>
-                    <input
-                      type="date"
-                      value={endDate}
-                      onChange={(e) => handleEndDateChange(e.target.value)}
-                    />
-                  </div>
-                </div>
-              </>
-            )}
             <p className={`modal-field-label ${errors.has('rateType') ? 'label-error' : ''}`}>Tipo di rata <span className="required-tag">*</span></p>
             <div className="rate-type-row">
               <select
@@ -813,6 +871,21 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                 <option value="fissa">Fissa</option>
               </select>
             </div>
+            <p className={`modal-field-label ${errors.has('duration') ? 'label-error' : ''}`}>N° Rate da pagare <span className="required-tag">*</span></p>
+            <div className="inline-field" style={{ justifyContent: 'center' }}>
+              <div className="stepper">
+                <button type="button" className="stepper-btn stepper-btn-minus" {...stepperMinus(() => parseInt(newDuration) || 0, handleDurationChange)}>−</button>
+                <input
+                  ref={durationRef}
+                  type="number"
+                  min="0"
+                  value={newDuration}
+                  onChange={(e) => handleDurationChange(e.target.value)}
+                  className="stepper-input"
+                />
+                <button type="button" className="stepper-btn stepper-btn-plus" {...stepperPlus(() => parseInt(newDuration) || 0, handleDurationChange)}>+</button>
+              </div>
+            </div>
             {rateMode === 'fissa' && (
               <>
                 <p className="modal-field-label">Importo singola rata</p>
@@ -826,12 +899,7 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                       const rata = parseFloat(`${e.target.value || '0'}.${fixedRateDec || '0'}`);
                       const amount = parseFloat(`${amountInt || '0'}.${amountDec || '0'}`);
                       if (rata > 0 && amount > 0) {
-                        const mesi = Math.ceil(amount / rata);
-                        if (durationType === 'anni') {
-                          setNewDuration(Math.ceil(mesi / 12).toString());
-                        } else {
-                          setNewDuration(mesi.toString());
-                        }
+                        handleDurationChange(Math.ceil(amount / rata).toString());
                       }
                     }}
                   />
@@ -846,12 +914,7 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                       const rata = parseFloat(`${fixedRateInt || '0'}.${val || '0'}`);
                       const amount = parseFloat(`${amountInt || '0'}.${amountDec || '0'}`);
                       if (rata > 0 && amount > 0) {
-                        const mesi = Math.ceil(amount / rata);
-                        if (durationType === 'anni') {
-                          setNewDuration(Math.ceil(mesi / 12).toString());
-                        } else {
-                          setNewDuration(mesi.toString());
-                        }
+                        handleDurationChange(Math.ceil(amount / rata).toString());
                       }
                     }}
                     className="amount-dec"
@@ -860,10 +923,33 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                 </div>
               </>
             )}
+            {(parseInt(newDuration) || 0) > 0 && (
+              <>
+                <p className="modal-field-label">Periodo <span className="optional-tag">(opzionale)</span></p>
+                <div className="date-row">
+                  <div className="date-field">
+                    <label>Inizio</label>
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => handleStartDateChange(e.target.value)}
+                    />
+                  </div>
+                  <div className="date-field">
+                    <label>Fine</label>
+                    <input
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => handleEndDateChange(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
             <div className="inline-field">
               <p className="modal-field-label">N° Rate già pagate <span className="optional-tag">(opzionale)</span></p>
               <div className="stepper">
-                <button type="button" className="stepper-btn stepper-btn-minus" onClick={() => updatePaidRatesCount(String(Math.max(0, (parseInt(initialPaidRates) || 0) - 1)))}>−</button>
+                <button type="button" className="stepper-btn stepper-btn-minus" {...stepperMinus(() => parseInt(initialPaidRates) || 0, updatePaidRatesCount)}>−</button>
                 <input
                   type="number"
                   min="0"
@@ -871,7 +957,7 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                   onChange={(e) => updatePaidRatesCount(e.target.value)}
                   className="stepper-input"
                 />
-                <button type="button" className="stepper-btn stepper-btn-plus" onClick={() => updatePaidRatesCount(String((parseInt(initialPaidRates) || 0) + 1))}>+</button>
+                <button type="button" className="stepper-btn stepper-btn-plus" {...stepperPlus(() => parseInt(initialPaidRates) || 0, updatePaidRatesCount)}>+</button>
               </div>
             </div>
             {(parseInt(initialPaidRates) || 0) > 0 && (
@@ -1012,7 +1098,7 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
               onChange={(e) => setEditName(e.target.value)}
               autoFocus
             />
-            <p className="modal-field-label">Totale da pagare <span className="required-tag">*</span></p>
+            <p className="modal-field-label">Importo totale da pagare <span className="required-tag">*</span></p>
             <div className="amount-row">
               <input
                 type="number"
@@ -1152,7 +1238,7 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
             <div className="inline-field">
               <p className="modal-field-label">N° Rate già pagate <span className="optional-tag">(opzionale)</span></p>
               <div className="stepper">
-                <button type="button" className="stepper-btn stepper-btn-minus" onClick={() => updateEditPaidRatesCount(String(Math.max(0, (parseInt(editInitialPaidRates) || 0) - 1)))}>−</button>
+                <button type="button" className="stepper-btn stepper-btn-minus" {...stepperMinus(() => parseInt(editInitialPaidRates) || 0, updateEditPaidRatesCount)}>−</button>
                 <input
                   type="number"
                   min="0"
@@ -1160,7 +1246,7 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                   onChange={(e) => updateEditPaidRatesCount(e.target.value)}
                   className="stepper-input"
                 />
-                <button type="button" className="stepper-btn stepper-btn-plus" onClick={() => updateEditPaidRatesCount(String((parseInt(editInitialPaidRates) || 0) + 1))}>+</button>
+                <button type="button" className="stepper-btn stepper-btn-plus" {...stepperPlus(() => parseInt(editInitialPaidRates) || 0, updateEditPaidRatesCount)}>+</button>
               </div>
             </div>
             {(parseInt(editInitialPaidRates) || 0) > 0 && (

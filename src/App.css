@@ -6,11 +6,26 @@
 }
 
 body {
-  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-  background: linear-gradient(135deg, #b8d8ba 0%, #d4edda 50%, #c3e6cb 100%);
+  font-family: -apple-system, 'Segoe UI', system-ui, Roboto, sans-serif;
+  background: #d0e8d2;
   min-height: 100vh;
   color: #2d5a3d;
   touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+input, select, button {
+  font-family: inherit;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%232d5a3d' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  padding-right: 2rem !important;
 }
 
 .page {
@@ -30,6 +45,7 @@ body {
   gap: 1rem;
   border-radius: 0 0 1.5rem 1.5rem;
   box-shadow: 0 4px 15px rgba(74, 140, 92, 0.3);
+  border-bottom: none;
 }
 
 .header h1 {
@@ -82,6 +98,116 @@ body {
 /* ===== CONTENT ===== */
 .content {
   padding: 1.5rem 1rem;
+}
+
+.home-sticky-top {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.sticky-bar {
+  background: #d0e8d2;
+  padding: 0.75rem 1rem 0.5rem;
+}
+
+.toolbar {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+
+.toolbar-btn {
+  padding: 0.4rem 1rem;
+  border: 1px solid #333;
+  border-radius: 0.6rem;
+  font-weight: 700;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.toolbar-btn-create {
+  background: #27ae60;
+  color: white;
+}
+
+.toolbar-btn-create:hover {
+  background: #1e9c53;
+}
+
+.toolbar-btn-search {
+  background: white;
+  color: #2d5a3d;
+  font-size: 0.9rem;
+  padding: 0.4rem 0.75rem;
+}
+
+.toolbar-btn-search.active {
+  background: white;
+  color: #2d5a3d;
+}
+
+.search-bar {
+  margin-top: 0.5rem;
+  animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.search-input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 2px solid #d4edda;
+  border-radius: 0.6rem;
+  font-size: 0.85rem;
+  color: #2d5a3d;
+  background: white;
+  outline: none;
+  margin-bottom: 0.4rem;
+}
+
+.search-input:focus {
+  border-color: #4a8c5c;
+}
+
+.filter-buttons {
+  display: flex;
+  gap: 0.35rem;
+  justify-content: center;
+}
+
+.filter-btn {
+  padding: 0.3rem 0.75rem;
+  border: 1px solid #d4edda;
+  border-radius: 0.5rem;
+  background: white;
+  color: #6b9e7d;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.filter-btn.active {
+  background: #4a8c5c;
+  color: white;
+  border-color: #4a8c5c;
+}
+
+.filter-debito.active {
+  background: #c0392b;
+  border-color: #c0392b;
+}
+
+.filter-credito.active {
+  background: #5dade2;
+  border-color: #5dade2;
 }
 
 .section-title {
@@ -548,6 +674,14 @@ body {
   background: #a93226;
 }
 
+.btn-hint {
+  display: block;
+  font-size: 0.6rem;
+  font-weight: 400;
+  color: #ccc;
+  margin-top: 2px;
+}
+
 .short-pay-balance {
   display: flex;
   justify-content: space-between;
@@ -785,6 +919,12 @@ body {
   grid-template-columns: 1fr 1fr 1fr;
 }
 
+.summary-column {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
 .summary-box {
   background: #f0f9f2;
   border: 2px solid #d4edda;
@@ -944,6 +1084,15 @@ body {
   gap: 0.5rem;
   margin-bottom: 1rem;
   align-items: stretch;
+}
+
+.duration-centered {
+  justify-content: center;
+}
+
+.duration-centered input {
+  text-align: center;
+  max-width: 200px;
 }
 
 .duration-row input,
