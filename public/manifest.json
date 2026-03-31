@@ -1,0 +1,20 @@
+{
+  "name": "Rate & Pagamenti",
+  "short_name": "Rate",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#d4edda",
+  "theme_color": "#4a8c5c",
+  "icons": [
+    {
+      "src": "/rate-icon192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/rate-icon512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
