@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import * as XLSX from 'xlsx';
 import type { Financing, Payment } from '../types';
 
 interface Props {
@@ -59,7 +60,9 @@ export default function DetailPage({ financings, onUpdate }: Props) {
   const rateAmount = financing.fixedRateAmount || (financing.totalMonths > 0 ? financing.totalAmount / financing.totalMonths : 0);
   const ratesPaid = (rateAmount > 0 ? Math.floor(paid / rateAmount) : 0) + (financing.initialPaidRates || 0);
   const remainingMonths = financing.totalMonths - ratesPaid;
-  const progress = financing.totalAmount > 0 ? (paid / financing.totalAmount) * 100 : 0;
+  const progressInterestPaid = financing.interestPerRate ? financing.interestPerRate * (financing.payments.length + (financing.initialPaidRates || 0)) : 0;
+  const progressCapitalOnly = Math.max(paid - progressInterestPaid, 0);
+  const progress = financing.totalAmount > 0 ? (progressCapitalOnly / financing.totalAmount) * 100 : 0;
 
   const isFixed = (financing.rateMode || 'variabile') === 'fissa' && rateAmount > 0;
   const fixedInt = isFixed ? Math.floor(rateAmount).toString() : '';
@@ -219,7 +222,7 @@ export default function DetailPage({ financings, onUpdate }: Props) {
                 const expectedTotal = financing.payments.length * rateAmount;
                 const balance = financing.payments.length === 0 ? 0 : totalPaidRates - expectedTotal;
                 const label = Math.abs(balance) < 0.01 ? 'Pareggio di bilancio' : balance > 0 ? 'Credito' : 'Debito';
-                const color = Math.abs(balance) < 0.01 ? '#27ae60' : balance > 0 ? '#5dade2' : '#c0392b';
+                const color = Math.abs(balance) < 0.01 ? '#1a7a42' : balance > 0 ? '#1a5276' : '#7b241c';
                 return (
                   <div className="summary-box" style={{ borderColor: color }}>
                     <span className="summary-label">SITUAZIONE</span>
@@ -230,9 +233,9 @@ export default function DetailPage({ financings, onUpdate }: Props) {
                   </div>
                 );
               })()}
-              <div className="summary-box highlight">
-                <span className="summary-label">TOTALE</span>
-                <span className="summary-value">{financing.totalAmount.toFixed(2)} €</span>
+              <div className="summary-box" style={{ borderColor: '#c0392b' }}>
+                <span className="summary-label">TOTALE DA PAGARE</span>
+                <span className="summary-value" style={{ color: '#c0392b' }}>{financing.totalAmount.toFixed(2)} €</span>
               </div>
               {(() => {
                 const totalRatesPaidCount = financing.payments.length + (financing.initialPaidRates || 0);
@@ -240,15 +243,15 @@ export default function DetailPage({ financings, onUpdate }: Props) {
                 const capitalPaid = paid - interestPaid;
                 return (
                   <>
-                    <div className="summary-box">
+                    <div className="summary-box" style={{ borderColor: '#27ae60' }}>
                       <span className="summary-label">PAGATO (NO INTERESSI)</span>
                       <span className="summary-value" style={{ color: '#27ae60' }}>{(capitalPaid > 0 ? capitalPaid : 0).toFixed(2)} €</span>
                     </div>
-                    <div className="summary-box">
+                    <div className="summary-box" style={{ borderColor: '#3498db' }}>
                       <span className="summary-label">INTERESSI PAGATI</span>
                       <span className="summary-value" style={{ color: '#3498db' }}>{interestPaid.toFixed(2)} €</span>
                     </div>
-                    <div className="summary-box">
+                    <div className="summary-box" style={{ borderColor: '#d4a017' }}>
                       <span className="summary-label">RESTANTE</span>
                       <span className="summary-value" style={{ color: '#d4a017' }}>{Math.max(residuo, 0).toFixed(2)} €</span>
                     </div>
@@ -257,17 +260,17 @@ export default function DetailPage({ financings, onUpdate }: Props) {
               })()}
             </div>
             <div className="summary-column">
-              <div className="summary-box">
+              <div className="summary-box" style={{ borderColor: '#333' }}>
                 <span className="summary-label">RATE PAGATE</span>
-                <span className="summary-value">{ratesPaid}</span>
+                <span className="summary-value" style={{ color: '#333' }}>{ratesPaid}</span>
                 <span className="summary-sub">su {financing.totalMonths} rate totali</span>
               </div>
-              <div className="summary-box">
+              <div className="summary-box" style={{ borderColor: '#999' }}>
                 <span className="summary-label">RATE RIMANENTI</span>
-                <span className="summary-value">{Math.max(remainingMonths, 0)}</span>
+                <span className="summary-value" style={{ color: '#999' }}>{Math.max(remainingMonths, 0)}</span>
               </div>
               {(financing.rateMode || 'variabile') === 'fissa' && rateAmount > 0 && (
-                <div className="summary-box">
+                <div className="summary-box" style={{ borderColor: '#8e44ad' }}>
                   <span className="summary-label">RATA FISSA</span>
                   <span className="summary-value" style={{ color: '#8e44ad' }}>{rateAmount.toFixed(2)} €</span>
                 </div>
@@ -276,10 +279,16 @@ export default function DetailPage({ financings, onUpdate }: Props) {
                 const interestPerRate = financing.interestPerRate ?? (financing.fixedRateAmount && financing.totalMonths > 0 ? (financing.fixedRateAmount * financing.totalMonths - financing.totalAmount) / financing.totalMonths : 0);
                 if (!interestPerRate || interestPerRate < 0.01) return null;
                 return (
-                  <div className="summary-box">
-                    <span className="summary-label">INTERESSI X RATA</span>
-                    <span className="summary-value" style={{ color: '#3498db' }}>{interestPerRate.toFixed(2)} €</span>
-                  </div>
+                  <>
+                    <div className="summary-box" style={{ borderColor: '#3498db' }}>
+                      <span className="summary-label">INTERESSI X RATA</span>
+                      <span className="summary-value" style={{ color: '#3498db' }}>{interestPerRate.toFixed(2)} €</span>
+                    </div>
+                    <div className="summary-box" style={{ borderColor: '#1abc9c' }}>
+                      <span className="summary-label">PAGATO + INTERESSI</span>
+                      <span className="summary-value" style={{ color: '#1abc9c' }}>{(paid > 0 ? paid : 0).toFixed(2)} €</span>
+                    </div>
+                  </>
                 );
               })()}
             </div>
@@ -288,12 +297,28 @@ export default function DetailPage({ financings, onUpdate }: Props) {
             <span className="progress-label">AVANZAMENTO</span>
             <span className="progress-percent">{progress.toFixed(1)}%</span>
           </div>
-          <div className="progress-bar big">
-            <div
-              className="progress-fill"
-              style={{ width: `${Math.min(progress, 100)}%`, background: getProgressColor(progress) }}
-            />
-          </div>
+          {(() => {
+            const totalRatesPaidProg = financing.payments.length + (financing.initialPaidRates || 0);
+            const interestPaidProg = financing.interestPerRate ? financing.interestPerRate * totalRatesPaidProg : 0;
+            const capitalPaidProg = paid - interestPaidProg;
+            const progressCapital = financing.totalAmount > 0 ? (Math.max(capitalPaidProg, 0) / financing.totalAmount) * 100 : 0;
+            const totalRates = financing.totalMonths || 0;
+            return (
+              <div className="progress-bar big progress-bar-ticks">
+                <div
+                  className="progress-fill"
+                  style={{ width: `${Math.min(progressCapital, 100)}%`, background: getProgressColor(progressCapital) }}
+                />
+                {totalRates > 1 && Array.from({ length: totalRates - 1 }, (_, i) => (
+                  <div
+                    key={i}
+                    className="progress-tick"
+                    style={{ left: `${((i + 1) / totalRates) * 100}%` }}
+                  />
+                ))}
+              </div>
+            );
+          })()}
         </div>
 
         {/* RATE IRREGOLARI */}
@@ -480,6 +505,81 @@ export default function DetailPage({ financings, onUpdate }: Props) {
             </div>
             )}
           </div>
+
+        {/* ESPORTA EXCEL */}
+        <div style={{ textAlign: 'center', margin: '1.5rem 0' }}>
+          <button
+            className="btn-excel"
+            onClick={() => {
+              const wb = XLSX.utils.book_new();
+              const totalRatesPaidX = financing.payments.length + (financing.initialPaidRates || 0);
+              const interestPerRateX = financing.interestPerRate ?? 0;
+              const interestPaidX = interestPerRateX * totalRatesPaidX;
+              const capitalPaidX = Math.max(paid - interestPaidX, 0);
+
+              // --- Foglio 1: Riepilogo ---
+              const riepilogo = [];
+              riepilogo.push(['DATI FINANZIAMENTO', '']);
+              riepilogo.push(['Campo', 'Valore']);
+              riepilogo.push(['Nome', financing.name]);
+              riepilogo.push(['Totale da pagare', financing.totalAmount.toFixed(2) + ' €']);
+              riepilogo.push(['Rate totali', financing.totalMonths]);
+              riepilogo.push(['Tipo rata', financing.rateType.charAt(0).toUpperCase() + financing.rateType.slice(1)]);
+              riepilogo.push(['Modalita rata', financing.rateMode.charAt(0).toUpperCase() + financing.rateMode.slice(1)]);
+              riepilogo.push(['Data inizio', financing.startDate ? new Date(financing.startDate).toLocaleDateString('it-IT') : '-']);
+              riepilogo.push(['Data fine', financing.endDate ? new Date(financing.endDate).toLocaleDateString('it-IT') : '-']);
+              if (rateAmount > 0) riepilogo.push(['Importo rata', rateAmount.toFixed(2) + ' €']);
+              if (interestPerRateX > 0) riepilogo.push(['Interessi per rata', interestPerRateX.toFixed(2) + ' €']);
+              riepilogo.push(['', '']);
+              riepilogo.push(['SITUAZIONE PAGAMENTI', '']);
+              riepilogo.push(['Campo', 'Valore']);
+              riepilogo.push(['Pagato (capitale)', capitalPaidX.toFixed(2) + ' €']);
+              riepilogo.push(['Interessi pagati', interestPaidX.toFixed(2) + ' €']);
+              riepilogo.push(['Totale versato', paid.toFixed(2) + ' €']);
+              riepilogo.push(['Restante', Math.max(financing.totalAmount - paid, 0).toFixed(2) + ' €']);
+              riepilogo.push(['', '']);
+              riepilogo.push(['AVANZAMENTO RATE', '']);
+              riepilogo.push(['Campo', 'Valore']);
+              riepilogo.push(['Rate pagate', totalRatesPaidX]);
+              riepilogo.push(['Rate rimanenti', Math.max(financing.totalMonths - totalRatesPaidX, 0)]);
+              riepilogo.push(['Avanzamento', totalRatesPaidX + ' / ' + financing.totalMonths]);
+
+              const wsRiepilogo = XLSX.utils.aoa_to_sheet(riepilogo);
+              wsRiepilogo['!cols'] = [{ wch: 24 }, { wch: 22 }];
+              XLSX.utils.book_append_sheet(wb, wsRiepilogo, 'Riepilogo');
+
+              // --- Foglio 2: Storico pagamenti ---
+              const payments = [...financing.payments].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+              const hasInterest = interestPerRateX > 0;
+              const storico = [];
+              if (hasInterest) {
+                storico.push(['N.', 'Data', 'Importo totale', 'Capitale', 'Interessi', 'Note']);
+                payments.forEach((p, i) => {
+                  const cap = Math.max(p.amount - interestPerRateX, 0);
+                  storico.push([i + 1, new Date(p.date).toLocaleDateString('it-IT'), p.amount.toFixed(2) + ' €', cap.toFixed(2) + ' €', interestPerRateX.toFixed(2) + ' €', p.note || '']);
+                });
+                storico.push([]);
+                storico.push(['', 'TOTALE', payments.reduce((s, p) => s + p.amount, 0).toFixed(2) + ' €', capitalPaidX.toFixed(2) + ' €', interestPaidX.toFixed(2) + ' €', '']);
+              } else {
+                storico.push(['N.', 'Data', 'Importo', 'Note']);
+                payments.forEach((p, i) => {
+                  storico.push([i + 1, new Date(p.date).toLocaleDateString('it-IT'), p.amount.toFixed(2) + ' €', p.note || '']);
+                });
+                storico.push([]);
+                storico.push(['', 'TOTALE', payments.reduce((s, p) => s + p.amount, 0).toFixed(2) + ' €', '']);
+              }
+              const wsStorico = XLSX.utils.aoa_to_sheet(storico);
+              wsStorico['!cols'] = hasInterest
+                ? [{ wch: 5 }, { wch: 14 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 28 }]
+                : [{ wch: 5 }, { wch: 14 }, { wch: 16 }, { wch: 28 }];
+              XLSX.utils.book_append_sheet(wb, wsStorico, 'Storico Pagamenti');
+
+              XLSX.writeFile(wb, financing.name + '_finanziamento.xlsx');
+            }}
+          >
+            <span className="btn-excel-icon">X</span> Esporta in Excel
+          </button>
+        </div>
       </div>
 
       {editingPayment && (

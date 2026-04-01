@@ -3,6 +3,7 @@
   "short_name": "Payments",
   "start_url": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#2d6a3f",
   "theme_color": "#2d6a3f",
   "icons": [

@@ -576,7 +576,6 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
             const rateAmount = f.fixedRateAmount || (f.totalMonths > 0 ? f.totalAmount / f.totalMonths : 0);
             const ratesPaid = (rateAmount > 0 ? Math.floor(paid / rateAmount) : 0) + (f.initialPaidRates || 0);
             const remainingMonths = f.totalMonths - ratesPaid;
-            const progress = f.totalAmount > 0 ? (paid / f.totalAmount) * 100 : 0;
 
             const residuo = f.totalAmount - paid;
             const formatPeriod = () => {
@@ -665,12 +664,28 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                     );
                   })()}
                 </div>
-                <div className="progress-bar">
-                  <div
-                    className="progress-fill"
-                    style={{ width: `${Math.min(progress, 100)}%`, background: getProgressColor(progress) }}
-                  />
-                </div>
+                {(() => {
+                  const totalRatesPaidProg = f.payments.length + (f.initialPaidRates || 0);
+                  const interestPaidProg = f.interestPerRate ? f.interestPerRate * totalRatesPaidProg : 0;
+                  const capitalPaidProg = paid - interestPaidProg;
+                  const progressCapital = f.totalAmount > 0 ? (Math.max(capitalPaidProg, 0) / f.totalAmount) * 100 : 0;
+                  const totalRates = f.totalMonths || 0;
+                  return (
+                    <div className="progress-bar progress-bar-ticks">
+                      <div
+                        className="progress-fill"
+                        style={{ width: `${Math.min(progressCapital, 100)}%`, background: getProgressColor(progressCapital) }}
+                      />
+                      {totalRates > 1 && Array.from({ length: totalRates - 1 }, (_, i) => (
+                        <div
+                          key={i}
+                          className="progress-tick"
+                          style={{ left: `${((i + 1) / totalRates) * 100}%` }}
+                        />
+                      ))}
+                    </div>
+                  );
+                })()}
                 <hr className="card-separator" />
                 <div className={`card-rate-mode ${(f.rateMode || 'variabile') === 'fissa' ? 'mode-fissa' : 'mode-variabile'}`}>
                   Rata {((f.rateMode || 'variabile').charAt(0).toUpperCase() + (f.rateMode || 'variabile').slice(1))}
