@@ -755,7 +755,7 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                                       setShortPayDetail(null);
                                     }}
                                   >
-                                    Elimina notifiche
+                                    Elimina irregolarità
                                     <span className="btn-hint">(Consigliato)</span>
                                   </button>
                                 )}
@@ -783,6 +783,21 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                       >
                         ←
                       </button>
+                      {(f.rateMode || 'variabile') === 'fissa' && quickPayOriginal && `${quickPayInt || '0'}.${quickPayDec || '0'}` !== quickPayOriginal && (
+                        <button
+                          className="btn-refresh"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const ra = f.totalMonths > 0 ? f.totalAmount / f.totalMonths : 0;
+                            setQuickPayInt(Math.floor(ra).toString());
+                            const d = Math.round((ra - Math.floor(ra)) * 100);
+                            setQuickPayDec(d > 0 ? d.toString() : '');
+                            setQuickPayNote('');
+                          }}
+                        >
+                          ↺
+                        </button>
+                      )}
                       <input
                         type="number"
                         placeholder="Euro"
@@ -826,10 +841,10 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                         ✓
                       </button>
                     </div>
-                    {quickPayOriginal && `${quickPayInt || '0'}.${quickPayDec || '0'}` !== quickPayOriginal && (
+                    {((quickPayOriginal && `${quickPayInt || '0'}.${quickPayDec || '0'}` !== quickPayOriginal) || (f.rateMode || 'variabile') === 'variabile') && (
                       <input
                         type="text"
-                        placeholder="Nota: motivo della modifica (opzionale)"
+                        placeholder="Nota (opzionale)..."
                         value={quickPayNote}
                         onChange={(e) => setQuickPayNote(e.target.value)}
                         className="quick-pay-note"
