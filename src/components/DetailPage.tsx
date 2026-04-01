@@ -260,14 +260,14 @@ export default function DetailPage({ financings, onUpdate }: Props) {
               })()}
             </div>
             <div className="summary-column">
-              <div className="summary-box" style={{ borderColor: '#333' }}>
+              <div className="summary-box" style={{ borderColor: '#999' }}>
                 <span className="summary-label">RATE PAGATE</span>
-                <span className="summary-value" style={{ color: '#333' }}>{ratesPaid}</span>
+                <span className="summary-value" style={{ color: '#999' }}>{ratesPaid}</span>
                 <span className="summary-sub">su {financing.totalMonths} rate totali</span>
               </div>
-              <div className="summary-box" style={{ borderColor: '#999' }}>
+              <div className="summary-box" style={{ borderColor: '#333' }}>
                 <span className="summary-label">RATE RIMANENTI</span>
-                <span className="summary-value" style={{ color: '#999' }}>{Math.max(remainingMonths, 0)}</span>
+                <span className="summary-value" style={{ color: '#333' }}>{Math.max(remainingMonths, 0)}</span>
               </div>
               {(financing.rateMode || 'variabile') === 'fissa' && rateAmount > 0 && (
                 <div className="summary-box" style={{ borderColor: '#8e44ad' }}>
