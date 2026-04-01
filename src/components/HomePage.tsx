@@ -59,7 +59,7 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
   const [editFixedRateDec, setEditFixedRateDec] = useState('');
   const [editInitialPaidRates, setEditInitialPaidRates] = useState('');
   const [editPaidMode, setEditPaidMode] = useState<'singola' | 'totale'>('totale');
-  const [editPaidSlideDir, setEditPaidSlideDir] = useState<'slide-left' | 'slide-right'>('slide-right');
+  const [, /* editPaidSlideDir */] = useState<'slide-left' | 'slide-right'>('slide-right');
   const [editSingleRates, setEditSingleRates] = useState<{ int: string; dec: string }[]>([]);
   const [editInitialPaidInt, setEditInitialPaidInt] = useState('');
   const [editInitialPaidDec, setEditInitialPaidDec] = useState('');
@@ -77,7 +77,7 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
   const [fixedRateDec, setFixedRateDec] = useState('');
   const [initialPaidRates, setInitialPaidRates] = useState('0');
   const [paidMode, setPaidMode] = useState<'singola' | 'totale'>('totale');
-  const [paidSlideDir, setPaidSlideDir] = useState<'slide-left' | 'slide-right'>('slide-right');
+  const [, /* paidSlideDir */] = useState<'slide-left' | 'slide-right'>('slide-right');
   const [singleRates, setSingleRates] = useState<{ int: string; dec: string }[]>([]);
   const [initialPaidInt, setInitialPaidInt] = useState('');
   const [initialPaidDec, setInitialPaidDec] = useState('');
@@ -206,7 +206,7 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
   const updatePaidRatesCount = (val: string) => {
     setInitialPaidRates(val);
     const n = parseInt(val) || 0;
-    const filled = autoFillRates(n, fixedRateInt, fixedRateDec, rateMode);
+    const filled = rateMode ? autoFillRates(n, fixedRateInt, fixedRateDec, rateMode) : null;
     if (filled) {
       setSingleRates(filled);
     } else {
@@ -371,17 +371,6 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
     recalcFixedRate(d);
   };
 
-  const handleDurationTypeChange = (val: 'mesi' | 'anni') => {
-    setDurationType(val);
-    const d = parseInt(newDuration) || 0;
-    const months = val === 'anni' ? d * 12 : d;
-    if (startDate && months > 0) {
-      setEndDate(addMonthsToDate(startDate, months));
-    } else if (endDate && months > 0) {
-      setStartDate(subMonthsFromDate(endDate, months));
-    }
-    recalcFixedRate(d);
-  };
 
   const handleCreate = () => {
     const missing: string[] = [];
@@ -450,14 +439,18 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
   return (
     <div className="page home-page">
       <div className="home-sticky-top">
-        <div className="header">
-          <div className="header-icon">💰</div>
-          <div className="header-center">
-            <h1>Rate & Pagamenti</h1>
-            <p className="header-subtitle">RIPRENDI IL CONTROLLO</p>
+        <nav className="navbar">
+          <div className="navbar-brand">
+            <div className="navbar-logo">
+              <span className="logo-icon">R</span>
+            </div>
+            <div className="navbar-text">
+              <h1>Rate & Pagamenti</h1>
+              <p className="navbar-tagline">Riprendi il controllo</p>
+            </div>
           </div>
-          <div className="header-icon">💰</div>
-        </div>
+          <div className="navbar-glow"></div>
+        </nav>
         <div className="sticky-bar">
           <h2 className="section-title">CARTELLE</h2>
           <div className="toolbar">

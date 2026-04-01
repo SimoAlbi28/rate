@@ -12,26 +12,7 @@ export default function DetailPage({ financings, onUpdate }: Props) {
   const navigate = useNavigate();
   const financing = financings.find((f) => f.id === id);
 
-  const [editAmountInt, setEditAmountInt] = useState(() => {
-    const v = financing?.totalAmount ?? 0;
-    return Math.floor(v).toString();
-  });
-  const [editAmountDec, setEditAmountDec] = useState(() => {
-    const v = financing?.totalAmount ?? 0;
-    const d = Math.round((v - Math.floor(v)) * 100);
-    return d > 0 ? d.toString() : '';
-  });
-  const [editDuration, setEditDuration] = useState(() => {
-    const m = financing?.totalMonths ?? 1;
-    if (m >= 12 && m % 12 === 0) return (m / 12).toString();
-    return m.toString();
-  });
-  const [editDurationType, setEditDurationType] = useState<'mesi' | 'anni'>(() => {
-    const m = financing?.totalMonths ?? 1;
-    return m >= 12 && m % 12 === 0 ? 'anni' : 'mesi';
-  });
   const [paymentInput, setPaymentInput] = useState('');
-  const [editingSettings, setEditingSettings] = useState(false);
 
   if (!financing) {
     return (
@@ -57,28 +38,6 @@ export default function DetailPage({ financings, onUpdate }: Props) {
   const ratesPaid = (rateAmount > 0 ? Math.floor(paid / rateAmount) : 0) + (financing.initialPaidRates || 0);
   const remainingMonths = financing.totalMonths - ratesPaid;
   const progress = financing.totalAmount > 0 ? (paid / financing.totalAmount) * 100 : 0;
-
-  const saveSettings = () => {
-    const amount = parseFloat(`${editAmountInt || '0'}.${editAmountDec || '0'}`);
-    const dur = parseInt(editDuration) || 1;
-    const months = editDurationType === 'anni' ? dur * 12 : dur;
-    onUpdate({ ...financing, totalAmount: amount, totalMonths: months });
-  };
-
-  const resetSettings = () => {
-    const v = financing.totalAmount;
-    setEditAmountInt(Math.floor(v).toString());
-    const d = Math.round((v - Math.floor(v)) * 100);
-    setEditAmountDec(d > 0 ? d.toString() : '');
-    const m = financing.totalMonths;
-    if (m >= 12 && m % 12 === 0) {
-      setEditDurationType('anni');
-      setEditDuration((m / 12).toString());
-    } else {
-      setEditDurationType('mesi');
-      setEditDuration(m.toString());
-    }
-  };
 
   const addPayment = () => {
     const val = parseFloat(paymentInput);
