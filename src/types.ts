@@ -20,4 +20,7 @@ export interface Financing {
   initialPaidRates: number;
   initialPaid: number;
   payments: Payment[];
+  fixedRateAmount?: number;
+  interestPerRate?: number;
+  totalInterest?: number;
 }

@@ -4,7 +4,7 @@ import type { Financing, RateType } from '../types';
 
 interface Props {
   financings: Financing[];
-  onAdd: (name: string, emoji: string, totalAmount: number, totalMonths: number, rateType: RateType, rateMode: 'fissa' | 'variabile', startDate: string, endDate: string, initialPaid: number, initialPaidRates: number) => void;
+  onAdd: (name: string, emoji: string, totalAmount: number, totalMonths: number, rateType: RateType, rateMode: 'fissa' | 'variabile', startDate: string, endDate: string, initialPaid: number, initialPaidRates: number, fixedRateAmount?: number) => void;
   onDelete: (id: string) => void;
   onUpdate: (updated: Financing) => void;
 }
@@ -261,10 +261,11 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
   };
 
   const getBalance = (f: Financing) => {
-    const ra = f.totalMonths > 0 ? f.totalAmount / f.totalMonths : 0;
+    const ra = f.fixedRateAmount || (f.totalMonths > 0 ? f.totalAmount / f.totalMonths : 0);
     if ((f.rateMode || 'variabile') !== 'fissa' || ra <= 0) return 0;
-    const irregulars = f.payments.filter(p => p.amount !== ra);
-    return irregulars.reduce((sum, p) => sum + (p.amount - ra), 0);
+    if (f.payments.length === 0) return 0;
+    const totalPaid = f.payments.reduce((sum, p) => sum + p.amount, 0);
+    return totalPaid - (f.payments.length * ra);
   };
 
   const filteredFinancings = financings
@@ -390,7 +391,6 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
     } else if (endDate && months > 0) {
       setStartDate(subMonthsFromDate(endDate, months));
     }
-    recalcFixedRate(d);
   };
 
 
@@ -437,7 +437,8 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
       return;
     }
     const months = durationType === 'anni' ? duration * 12 : duration;
-    onAdd(newName.trim(), selectedEmoji, amount, months, rateType as RateType, rateMode as 'fissa' | 'variabile', startDate, endDate, initialPaid, paidRates);
+    const fixedRate = rateMode === 'fissa' ? parseFloat(`${fixedRateInt || '0'}.${fixedRateDec || '0'}`) : undefined;
+    onAdd(newName.trim(), selectedEmoji, amount, months, rateType as RateType, rateMode as 'fissa' | 'variabile', startDate, endDate, initialPaid, paidRates, fixedRate);
     setNewName('');
     setSelectedEmoji('💳');
     setAmountInt('');
@@ -584,7 +585,7 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
         <div className="cards-grid">
           {filteredFinancings.map((f) => {
             const paid = f.payments.reduce((s, p) => s + p.amount, 0) + (f.initialPaid || 0);
-            const rateAmount = f.totalMonths > 0 ? f.totalAmount / f.totalMonths : 0;
+            const rateAmount = f.fixedRateAmount || (f.totalMonths > 0 ? f.totalAmount / f.totalMonths : 0);
             const ratesPaid = (rateAmount > 0 ? Math.floor(paid / rateAmount) : 0) + (f.initialPaidRates || 0);
             const remainingMonths = f.totalMonths - ratesPaid;
             const progress = f.totalAmount > 0 ? (paid / f.totalAmount) * 100 : 0;
@@ -656,13 +657,25 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                 </div>
                 <hr className="card-separator" />
                 {formatPeriod() && <div className="card-period-center">{formatPeriod()}</div>}
-                <div className="card-info-center card-info-blue">Mesi mancanti: {remainingMonths > 0 ? remainingMonths : 0}</div>
+                <div className="card-info-center" style={{ color: '#333' }}>Rate mancanti: {remainingMonths > 0 ? remainingMonths : 0} su {f.totalMonths}</div>
                 <hr className="card-separator" />
                 <div className="card-info-table">
-                  <div className="card-info card-info-red"><span>Da pagare:</span><span>{f.totalAmount.toFixed(2)} €</span></div>
-                  <div className="card-info card-info-green"><span>Pagato:</span><span>{paid.toFixed(2)} €</span></div>
-                  <hr className="card-separator" />
-                  <div className="card-info card-info-yellow"><span>Restante:</span><span>{residuo > 0 ? residuo.toFixed(2) : '0.00'} €</span></div>
+                  {(() => {
+                    const totalRatesPaid = f.payments.length + (f.initialPaidRates || 0);
+                    const interestPaid = f.interestPerRate ? f.interestPerRate * totalRatesPaid : 0;
+                    const capitalPaid = paid - interestPaid;
+                    return (
+                      <>
+                        <div className="card-info card-info-red"><span>Da pagare:</span><span>{f.totalAmount.toFixed(2)} €</span></div>
+                        <div className="card-info card-info-green"><span>Pagato:</span><span>{capitalPaid > 0 ? capitalPaid.toFixed(2) : '0.00'} €</span></div>
+                        {f.interestPerRate != null && f.interestPerRate > 0 && (
+                          <div className="card-info" style={{ color: '#3498db' }}><span>Interessi pagati:</span><span>{interestPaid.toFixed(2)} €</span></div>
+                        )}
+                        <hr className="card-separator" />
+                        <div className="card-info card-info-yellow"><span>Restante:</span><span>{residuo > 0 ? residuo.toFixed(2) : '0.00'} €</span></div>
+                      </>
+                    );
+                  })()}
                 </div>
                 <div className="progress-bar">
                   <div
@@ -677,8 +690,9 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                 {rateAmount > 0 && f.rateType && (f.rateMode || 'variabile') === 'fissa' && (() => {
                   const irregularPayments = f.payments.filter(p => p.amount !== rateAmount);
                   const hasIrregular = irregularPayments.length > 0;
-                  const irregularBalance = irregularPayments.reduce((sum, p) => sum + (p.amount - rateAmount), 0);
-                  const isBalanced = hasIrregular && irregularBalance === 0;
+                  const totalPaid = f.payments.reduce((sum, p) => sum + p.amount, 0);
+                  const irregularBalance = f.payments.length > 0 ? totalPaid - (f.payments.length * rateAmount) : 0;
+                  const isBalanced = f.payments.length === 0 || Math.abs(irregularBalance) < 0.01;
                   return (
                     <>
                       <div className="card-rate-info-row">
@@ -704,8 +718,8 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                             <button className="short-pay-close" onClick={(e) => { e.stopPropagation(); setShortPayDetail(null); }}>×</button>
                           </div>
                           {(() => {
-                            const balance = irregularPayments.reduce((sum, p) => sum + (p.amount - rateAmount), 0);
-                            const isBalanced = balance === 0;
+                            const balance = irregularBalance;
+                            const isBalanced = Math.abs(balance) < 0.01;
                             return (
                               <>
                                 {irregularPayments.map(p => {
@@ -811,7 +825,6 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                         value={quickPayInt}
                         onChange={(e) => setQuickPayInt(e.target.value)}
                         className="quick-pay-input"
-                        autoFocus
                       />
                       <span className="amount-sep">,</span>
                       <input
@@ -878,46 +891,21 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
             />
-            <p className={`modal-field-label ${errors.has('amount') ? 'label-error' : ''}`}>Importo totale da pagare <span className="required-tag">*</span></p>
+            <p className={`modal-field-label ${errors.has('amount') ? 'label-error' : ''}`}>Importo totale da pagare (senza interessi) <span className="required-tag">*</span></p>
             <div className={`amount-row ${errors.has('amount') ? 'input-error-row' : ''}`}>
               <input
                 ref={amountRef}
                 type="number"
                 placeholder="Euro"
                 value={amountInt}
-                onChange={(e) => {
-                  setAmountInt(e.target.value);
-                  if (rateMode === 'fissa') {
-                    const tot = parseFloat(`${e.target.value || '0'}.${amountDec || '0'}`);
-                    const dur = parseInt(newDuration) || 0;
-                    if (tot > 0 && dur > 0) {
-                      const rata = tot / dur;
-                      setFixedRateInt(Math.floor(rata).toString());
-                      const d = Math.round((rata - Math.floor(rata)) * 100);
-                      setFixedRateDec(d > 0 ? d.toString() : '');
-                    }
-                  }
-                }}
+                onChange={(e) => setAmountInt(e.target.value)}
               />
               <span className="amount-sep">,</span>
               <input
                 type="number"
                 placeholder="Cent"
                 value={amountDec}
-                onChange={(e) => {
-                  const val = e.target.value.slice(0, 2);
-                  setAmountDec(val);
-                  if (rateMode === 'fissa') {
-                    const tot = parseFloat(`${amountInt || '0'}.${val || '0'}`);
-                    const dur = parseInt(newDuration) || 0;
-                    if (tot > 0 && dur > 0) {
-                      const rata = tot / dur;
-                      setFixedRateInt(Math.floor(rata).toString());
-                      const d = Math.round((rata - Math.floor(rata)) * 100);
-                      setFixedRateDec(d > 0 ? d.toString() : '');
-                    }
-                  }
-                }}
+                onChange={(e) => setAmountDec(e.target.value.slice(0, 2))}
                 className="amount-dec"
               />
               <span className="amount-currency">€</span>
@@ -940,20 +928,7 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
               <select
                 className="modal-select"
                 value={rateMode}
-                onChange={(e) => {
-                  const mode = e.target.value as 'fissa' | 'variabile' | '';
-                  setRateMode(mode);
-                  if (mode === 'fissa') {
-                    const amount = parseFloat(`${amountInt || '0'}.${amountDec || '0'}`);
-                    const duration = parseInt(newDuration) || 0;
-                    if (amount > 0 && duration > 0) {
-                      const rata = amount / duration;
-                      setFixedRateInt(Math.floor(rata).toString());
-                      const dec = Math.round((rata - Math.floor(rata)) * 100);
-                      setFixedRateDec(dec > 0 ? dec.toString() : '');
-                    }
-                  }
-                }}
+                onChange={(e) => setRateMode(e.target.value as 'fissa' | 'variabile' | '')}
               >
                 <option value="" disabled>Seleziona</option>
                 <option value="variabile">Variabile</option>
@@ -977,35 +952,20 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
             </div>
             {rateMode === 'fissa' && (
               <>
-                <p className="modal-field-label">Importo singola rata</p>
+                <p className="modal-field-label">Importo singola rata (compresa d'interessi)</p>
                 <div className="amount-row">
                   <input
                     type="number"
                     placeholder="Euro"
                     value={fixedRateInt}
-                    onChange={(e) => {
-                      setFixedRateInt(e.target.value);
-                      const rata = parseFloat(`${e.target.value || '0'}.${fixedRateDec || '0'}`);
-                      const amount = parseFloat(`${amountInt || '0'}.${amountDec || '0'}`);
-                      if (rata > 0 && amount > 0) {
-                        handleDurationChange(Math.ceil(amount / rata).toString());
-                      }
-                    }}
+                    onChange={(e) => setFixedRateInt(e.target.value)}
                   />
                   <span className="amount-sep">,</span>
                   <input
                     type="number"
                     placeholder="Cent"
                     value={fixedRateDec}
-                    onChange={(e) => {
-                      const val = e.target.value.slice(0, 2);
-                      setFixedRateDec(val);
-                      const rata = parseFloat(`${fixedRateInt || '0'}.${val || '0'}`);
-                      const amount = parseFloat(`${amountInt || '0'}.${amountDec || '0'}`);
-                      if (rata > 0 && amount > 0) {
-                        handleDurationChange(Math.ceil(amount / rata).toString());
-                      }
-                    }}
+                    onChange={(e) => setFixedRateDec(e.target.value.slice(0, 2))}
                     className="amount-dec"
                   />
                   <span className="amount-currency">€</span>

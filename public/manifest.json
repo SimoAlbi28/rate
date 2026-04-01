@@ -1,6 +1,6 @@
 {
   "name": "Rate & Pagamenti",
-  "short_name": "Rate",
+  "short_name": "Payments",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#2d6a3f",

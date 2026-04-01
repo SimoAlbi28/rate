@@ -18,7 +18,14 @@ export default function App() {
     saveFinancings(updated);
   };
 
-  const addFinancing = (name: string, emoji: string, totalAmount: number, totalMonths: number, rateType: RateType, rateMode: 'fissa' | 'variabile', startDate: string, endDate: string, initialPaid: number, initialPaidRates: number) => {
+  const addFinancing = (name: string, emoji: string, totalAmount: number, totalMonths: number, rateType: RateType, rateMode: 'fissa' | 'variabile', startDate: string, endDate: string, initialPaid: number, initialPaidRates: number, fixedRateAmount?: number) => {
+    let interestPerRate: number | undefined;
+    let totalInterest: number | undefined;
+    if (rateMode === 'fissa' && fixedRateAmount && fixedRateAmount > 0 && totalMonths > 0) {
+      const totalWithInterest = fixedRateAmount * totalMonths;
+      totalInterest = totalWithInterest - totalAmount;
+      interestPerRate = totalInterest / totalMonths;
+    }
     const newF: Financing = {
       id: crypto.randomUUID(),
       name,
@@ -32,6 +39,9 @@ export default function App() {
       initialPaidRates,
       initialPaid,
       payments: [],
+      fixedRateAmount,
+      interestPerRate,
+      totalInterest,
     };
     persist([...financings, newF]);
   };

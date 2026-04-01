@@ -56,7 +56,7 @@ export default function DetailPage({ financings, onUpdate }: Props) {
   const paymentsPaid = financing.payments.reduce((s, p) => s + p.amount, 0);
   const paid = paymentsPaid + (financing.initialPaid || 0);
   const residuo = financing.totalAmount - paid;
-  const rateAmount = financing.totalMonths > 0 ? financing.totalAmount / financing.totalMonths : 0;
+  const rateAmount = financing.fixedRateAmount || (financing.totalMonths > 0 ? financing.totalAmount / financing.totalMonths : 0);
   const ratesPaid = (rateAmount > 0 ? Math.floor(paid / rateAmount) : 0) + (financing.initialPaidRates || 0);
   const remainingMonths = financing.totalMonths - ratesPaid;
   const progress = financing.totalAmount > 0 ? (paid / financing.totalAmount) * 100 : 0;
@@ -215,16 +215,16 @@ export default function DetailPage({ financings, onUpdate }: Props) {
           <div className="summary-grid">
             <div className="summary-column">
               {(financing.rateMode || 'variabile') === 'fissa' && (() => {
-                const irregulars = financing.payments.filter(p => p.amount !== rateAmount);
-                if (irregulars.length === 0) return null;
-                const balance = irregulars.reduce((sum, p) => sum + (p.amount - rateAmount), 0);
-                const label = balance === 0 ? 'Pareggio di bilancio' : balance > 0 ? 'Credito' : 'Debito';
-                const color = balance === 0 ? '#27ae60' : balance > 0 ? '#5dade2' : '#c0392b';
+                const totalPaidRates = financing.payments.reduce((sum, p) => sum + p.amount, 0);
+                const expectedTotal = financing.payments.length * rateAmount;
+                const balance = financing.payments.length === 0 ? 0 : totalPaidRates - expectedTotal;
+                const label = Math.abs(balance) < 0.01 ? 'Pareggio di bilancio' : balance > 0 ? 'Credito' : 'Debito';
+                const color = Math.abs(balance) < 0.01 ? '#27ae60' : balance > 0 ? '#5dade2' : '#c0392b';
                 return (
                   <div className="summary-box" style={{ borderColor: color }}>
                     <span className="summary-label">SITUAZIONE</span>
                     <span className="summary-value" style={{ color }}>{label}</span>
-                    {balance !== 0 && (
+                    {Math.abs(balance) >= 0.01 && (
                       <span className="summary-value" style={{ color }}>{balance > 0 ? '+' : '-'}{Math.abs(balance).toFixed(2)} €</span>
                     )}
                   </div>
@@ -234,14 +234,27 @@ export default function DetailPage({ financings, onUpdate }: Props) {
                 <span className="summary-label">TOTALE</span>
                 <span className="summary-value">{financing.totalAmount.toFixed(2)} €</span>
               </div>
-              <div className="summary-box">
-                <span className="summary-label">PAGATO</span>
-                <span className="summary-value" style={{ color: '#27ae60' }}>{paid.toFixed(2)} €</span>
-              </div>
-              <div className="summary-box">
-                <span className="summary-label">RESTANTE</span>
-                <span className="summary-value" style={{ color: '#d4a017' }}>{Math.max(residuo, 0).toFixed(2)} €</span>
-              </div>
+              {(() => {
+                const totalRatesPaidCount = financing.payments.length + (financing.initialPaidRates || 0);
+                const interestPaid = financing.interestPerRate ? financing.interestPerRate * totalRatesPaidCount : 0;
+                const capitalPaid = paid - interestPaid;
+                return (
+                  <>
+                    <div className="summary-box">
+                      <span className="summary-label">PAGATO (NO INTERESSI)</span>
+                      <span className="summary-value" style={{ color: '#27ae60' }}>{(capitalPaid > 0 ? capitalPaid : 0).toFixed(2)} €</span>
+                    </div>
+                    <div className="summary-box">
+                      <span className="summary-label">INTERESSI PAGATI</span>
+                      <span className="summary-value" style={{ color: '#3498db' }}>{interestPaid.toFixed(2)} €</span>
+                    </div>
+                    <div className="summary-box">
+                      <span className="summary-label">RESTANTE</span>
+                      <span className="summary-value" style={{ color: '#d4a017' }}>{Math.max(residuo, 0).toFixed(2)} €</span>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
             <div className="summary-column">
               <div className="summary-box">
@@ -259,6 +272,16 @@ export default function DetailPage({ financings, onUpdate }: Props) {
                   <span className="summary-value" style={{ color: '#8e44ad' }}>{rateAmount.toFixed(2)} €</span>
                 </div>
               )}
+              {isFixed && (() => {
+                const interestPerRate = financing.interestPerRate ?? (financing.fixedRateAmount && financing.totalMonths > 0 ? (financing.fixedRateAmount * financing.totalMonths - financing.totalAmount) / financing.totalMonths : 0);
+                if (!interestPerRate || interestPerRate < 0.01) return null;
+                return (
+                  <div className="summary-box">
+                    <span className="summary-label">INTERESSI X RATA</span>
+                    <span className="summary-value" style={{ color: '#3498db' }}>{interestPerRate.toFixed(2)} €</span>
+                  </div>
+                );
+              })()}
             </div>
           </div>
           <div className="progress-section">
@@ -276,9 +299,11 @@ export default function DetailPage({ financings, onUpdate }: Props) {
         {/* RATE IRREGOLARI */}
         {isFixed && (() => {
           const irregularPayments = financing.payments.filter(p => p.amount !== rateAmount);
-          if (irregularPayments.length === 0 && !dismissedIrregulars) return null;
-          const balance = irregularPayments.reduce((sum, p) => sum + (p.amount - rateAmount), 0);
-          const isBalanced = balance === 0;
+          const totalPaidRates = financing.payments.reduce((sum, p) => sum + p.amount, 0);
+          const expectedTotal = financing.payments.length * rateAmount;
+          const balance = totalPaidRates - expectedTotal;
+          const isBalanced = Math.abs(balance) < 0.01;
+          // always show section
           return (
             <div className="card section-card">
               <h3 className="section-heading" onClick={() => setShowIrregulars(!showIrregulars)} style={{ cursor: 'pointer', textAlign: 'center' }}>
@@ -416,9 +441,11 @@ export default function DetailPage({ financings, onUpdate }: Props) {
         </div>
 
         {/* STORICO PAGAMENTI */}
-        {financing.payments.length > 0 && (
-          <div className="card section-card">
+        <div className="card section-card">
             <h3 className="section-heading" style={{ textAlign: 'center' }}>📋 STORICO PAGAMENTI</h3>
+            {financing.payments.length === 0 ? (
+              <p style={{ textAlign: 'center', color: '#6b9e7d', fontStyle: 'italic' }}>Nessun pagamento registrato</p>
+            ) : (
             <div className="payments-list">
               <div className="payment-header">
                 <span className="payment-col-date">Data</span>
@@ -451,8 +478,8 @@ export default function DetailPage({ financings, onUpdate }: Props) {
                 </div>
               ))}
             </div>
+            )}
           </div>
-        )}
       </div>
 
       {editingPayment && (
