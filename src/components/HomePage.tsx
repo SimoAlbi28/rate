@@ -370,18 +370,6 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
     }
   };
 
-  const recalcFixedRate = (dur: number) => {
-    if (rateMode === 'fissa' && dur > 0) {
-      const tot = parseFloat(`${amountInt || '0'}.${amountDec || '0'}`);
-      if (tot > 0) {
-        const rata = tot / dur;
-        setFixedRateInt(Math.floor(rata).toString());
-        const dec = Math.round((rata - Math.floor(rata)) * 100);
-        setFixedRateDec(dec > 0 ? dec.toString() : '');
-      }
-    }
-  };
-
   const handleDurationChange = (val: string) => {
     setNewDuration(val);
     const d = parseInt(val) || 0;
