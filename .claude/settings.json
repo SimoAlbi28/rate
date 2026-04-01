@@ -4,7 +4,14 @@
       "Bash(pnpm add:*)",
       "Bash(npx tsc:*)",
       "Bash(npx vite:*)",
-      "Bash(pnpm run:*)"
+      "Bash(pnpm run:*)",
+      "Bash(convert public/rate-icon512.png -resize 512x512 /tmp/original_size.txt)",
+      "Bash(identify public/rate-icon192.png public/rate-icon512.png)",
+      "Bash(identify /root/simoproject/rate/public/rate-logo.png)",
+      "Bash(convert rate-logo.png -resize 512x512 -gravity center -extent 512x512 rate-icon512.png)",
+      "Bash(convert rate-logo.png -resize 192x192 -gravity center -extent 192x192 rate-icon192.png)",
+      "Bash(convert rate-logo.png -resize 512x512 rate-icon512.png)",
+      "Bash(convert rate-logo.png -resize 192x192 rate-icon192.png)"
     ]
   }
 }

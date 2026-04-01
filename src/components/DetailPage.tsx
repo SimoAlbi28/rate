@@ -12,7 +12,8 @@ export default function DetailPage({ financings, onUpdate }: Props) {
   const navigate = useNavigate();
   const financing = financings.find((f) => f.id === id);
 
-  const [paymentInput, setPaymentInput] = useState('');
+  const [paymentInt, setPaymentInt] = useState('');
+  const [paymentDec, setPaymentDec] = useState('');
 
   if (!financing) {
     return (
@@ -40,7 +41,7 @@ export default function DetailPage({ financings, onUpdate }: Props) {
   const progress = financing.totalAmount > 0 ? (paid / financing.totalAmount) * 100 : 0;
 
   const addPayment = () => {
-    const val = parseFloat(paymentInput);
+    const val = parseFloat(`${paymentInt || '0'}.${paymentDec || '0'}`);
     if (isNaN(val) || val <= 0) return;
     const payment: Payment = {
       id: crypto.randomUUID(),
@@ -51,7 +52,8 @@ export default function DetailPage({ financings, onUpdate }: Props) {
       ...financing,
       payments: [...financing.payments, payment],
     });
-    setPaymentInput('');
+    setPaymentInt('');
+    setPaymentDec('');
   };
 
   const deletePayment = (paymentId: string) => {
@@ -80,6 +82,22 @@ export default function DetailPage({ financings, onUpdate }: Props) {
           <h3 className="section-heading">📊 RIEPILOGO</h3>
           <div className="summary-grid">
             <div className="summary-column">
+              {(financing.rateMode || 'variabile') === 'fissa' && (() => {
+                const irregulars = financing.payments.filter(p => p.amount !== rateAmount);
+                if (irregulars.length === 0) return null;
+                const balance = irregulars.reduce((sum, p) => sum + (p.amount - rateAmount), 0);
+                const label = balance === 0 ? 'Pareggio di bilancio' : balance > 0 ? 'Credito' : 'Debito';
+                const color = balance === 0 ? '#27ae60' : balance > 0 ? '#5dade2' : '#c0392b';
+                return (
+                  <div className="summary-box" style={{ borderColor: color }}>
+                    <span className="summary-label">SITUAZIONE</span>
+                    <span className="summary-value" style={{ color }}>{label}</span>
+                    {balance !== 0 && (
+                      <span className="summary-value" style={{ color }}>{balance > 0 ? '+' : '-'}{Math.abs(balance).toFixed(2)} €</span>
+                    )}
+                  </div>
+                );
+              })()}
               <div className="summary-box highlight">
                 <span className="summary-label">TOTALE</span>
                 <span className="summary-value">{financing.totalAmount.toFixed(2)} €</span>
@@ -95,36 +113,20 @@ export default function DetailPage({ financings, onUpdate }: Props) {
             </div>
             <div className="summary-column">
               <div className="summary-box">
-                <span className="summary-label">RATE RIMANENTI</span>
-                <span className="summary-value">{Math.max(remainingMonths, 0)}</span>
+                <span className="summary-label">RATE PAGATE</span>
+                <span className="summary-value">{ratesPaid}</span>
                 <span className="summary-sub">su {financing.totalMonths} rate totali</span>
               </div>
               <div className="summary-box">
-                <span className="summary-label">RATE PAGATE</span>
-                <span className="summary-value">{ratesPaid}</span>
+                <span className="summary-label">RATE RIMANENTI</span>
+                <span className="summary-value">{Math.max(remainingMonths, 0)}</span>
               </div>
               {(financing.rateMode || 'variabile') === 'fissa' && rateAmount > 0 && (
                 <div className="summary-box">
-                  <span className="summary-label">RATA SINGOLA</span>
+                  <span className="summary-label">RATA FISSA</span>
                   <span className="summary-value" style={{ color: '#8e44ad' }}>{rateAmount.toFixed(2)} €</span>
                 </div>
               )}
-              {(financing.rateMode || 'variabile') === 'fissa' && (() => {
-                const irregulars = financing.payments.filter(p => p.amount !== rateAmount);
-                if (irregulars.length === 0) return null;
-                const balance = irregulars.reduce((sum, p) => sum + (p.amount - rateAmount), 0);
-                const label = balance === 0 ? 'Pareggio' : balance > 0 ? 'Credito' : 'Debito';
-                const color = balance === 0 ? '#27ae60' : balance > 0 ? '#5dade2' : '#c0392b';
-                return (
-                  <div className="summary-box" style={{ borderColor: color }}>
-                    <span className="summary-label">SITUAZIONE</span>
-                    <span className="summary-value" style={{ color, fontSize: '1.1rem' }}>{label}</span>
-                    {balance !== 0 && (
-                      <span className="summary-sub" style={{ color }}>{balance > 0 ? '+' : '-'}{Math.abs(balance).toFixed(2)} €</span>
-                    )}
-                  </div>
-                );
-              })()}
             </div>
           </div>
           <div className="progress-section">
@@ -142,15 +144,24 @@ export default function DetailPage({ financings, onUpdate }: Props) {
         {/* AGGIUNGI PAGAMENTO */}
         <div className="card section-card">
           <h3 className="section-heading">💳 AGGIUNGI PAGAMENTO</h3>
-          <div className="setting-row">
+          <div className="amount-row">
             <input
               type="number"
-              value={paymentInput}
-              onChange={(e) => setPaymentInput(e.target.value)}
-              placeholder="Importo rata €"
+              placeholder="Euro"
+              value={paymentInt}
+              onChange={(e) => setPaymentInt(e.target.value)}
             />
-            <button className="btn-primary" onClick={addPayment}>
-              + Aggiungi
+            <span className="amount-sep">,</span>
+            <input
+              type="number"
+              placeholder="Cent"
+              value={paymentDec}
+              onChange={(e) => setPaymentDec(e.target.value.slice(0, 2))}
+              style={{ maxWidth: '70px' }}
+            />
+            <span className="amount-currency">€</span>
+            <button className="btn-primary btn-tick" onClick={addPayment}>
+              ✓
             </button>
           </div>
         </div>

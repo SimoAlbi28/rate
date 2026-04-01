@@ -15,6 +15,19 @@ const EMOJI_OPTIONS = [
   '📦', '🐶', '🐱', '👶', '💍', '🛋️', '🧹', '🚌', '🅿️', '📰', '🏦',
 ];
 
+const PROFILE_ICONS = [
+  '👤', '👩', '👨', '🧑', '👧', '👦', '🧔', '👩‍💼', '👨‍💼', '🧑‍💻',
+  '👩‍🎓', '👨‍🎓', '🦸', '🧑‍🚀', '🥷', '🐻', '🦊', '🐼', '🦁', '🐸',
+  '👻', '🤖', '👽', '🎃', '😎', '🤠', '🥸', '🧛', '🧙', '🧑‍🎤',
+  '👩‍🔬', '👨‍🍳', '👩‍🚒', '👨‍✈️', '🧑‍⚕️', '💂', '🕵️', '👷', '👸', '🤴',
+  '🦄', '🐶', '🐱', '🐯', '🐨', '🐰', '🦉', '🦋', '🐙', '🐵',
+];
+
+const PROFILE_COLORS = [
+  '#e94560', '#f39c12', '#e67e22', '#2ecc71', '#1abc9c',
+  '#3498db', '#9b59b6', '#e84393', '#636e72', '#2d3436',
+];
+
 export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Props) {
   const navigate = useNavigate();
   const [showModal, setShowModal] = useState(false);
@@ -23,6 +36,10 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'tutti' | 'debito' | 'credito'>('tutti');
+  const [showProfile, setShowProfile] = useState(false);
+  const [profileIcon, setProfileIcon] = useState(() => localStorage.getItem('profileIcon') || '👤');
+  const [profileColor, setProfileColor] = useState(() => localStorage.getItem('profileColor') || '#3498db');
+  const [showAllProfileIcons, setShowAllProfileIcons] = useState(false);
   const [errors, setErrors] = useState<Set<string>>(new Set());
   const nameRef = useRef<HTMLInputElement>(null);
   const amountRef = useRef<HTMLInputElement>(null);
@@ -440,17 +457,74 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
     <div className="page home-page">
       <div className="home-sticky-top">
         <nav className="navbar">
-          <div className="navbar-brand">
-            <div className="navbar-logo">
-              <span className="logo-icon">R</span>
-            </div>
-            <div className="navbar-text">
-              <h1>Rate & Pagamenti</h1>
-              <p className="navbar-tagline">Riprendi il controllo</p>
+          <div className="navbar-left">
+            <img src="/rate-logo.png" alt="Logo" className="navbar-logo-img" />
+          </div>
+          <div className="navbar-center">
+            <h1>Rate & Pagamenti</h1>
+            <p className="navbar-tagline">Tutto quello che devi pagare, qui.</p>
+          </div>
+          <button className="navbar-profile" style={{ background: profileColor }} onClick={() => setShowProfile(true)}>
+            <span>{profileIcon}</span>
+          </button>
+        </nav>
+
+        {showProfile && (
+          <div className="modal-overlay" onClick={() => setShowProfile(false)}>
+            <div className="profile-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="profile-modal-header">
+                <h2>Il tuo profilo</h2>
+                <button className="profile-modal-close" onClick={() => setShowProfile(false)}>&times;</button>
+              </div>
+              <div className="profile-preview" style={{ background: profileColor }}>
+                <span>{profileIcon}</span>
+              </div>
+              <h3 className="profile-section-title">Scegli icona</h3>
+              <div className="profile-grid">
+                {(() => {
+                  const COLS = 5;
+                  const VISIBLE_ROWS = 3;
+                  const visibleCount = COLS * VISIBLE_ROWS;
+                  const icons = showAllProfileIcons
+                    ? PROFILE_ICONS
+                    : (() => {
+                        const idx = PROFILE_ICONS.indexOf(profileIcon);
+                        if (idx < visibleCount) return PROFILE_ICONS.slice(0, visibleCount);
+                        const reordered = [profileIcon, ...PROFILE_ICONS.filter((i) => i !== profileIcon)];
+                        return reordered.slice(0, visibleCount);
+                      })();
+                  return icons.map((icon) => (
+                    <button
+                      key={icon}
+                      className={`profile-grid-btn ${profileIcon === icon ? 'active' : ''}`}
+                      onClick={() => { setProfileIcon(icon); localStorage.setItem('profileIcon', icon); }}
+                    >
+                      {icon}
+                    </button>
+                  ));
+                })()}
+              </div>
+              <button className="profile-show-more" onClick={() => setShowAllProfileIcons(!showAllProfileIcons)}>
+                {showAllProfileIcons ? 'Mostra meno' : 'Mostra di più'}
+              </button>
+              <h3 className="profile-section-title">Colore sfondo</h3>
+              <div className="profile-colors">
+                {PROFILE_COLORS.map((color) => (
+                  <button
+                    key={color}
+                    className={`profile-color-btn ${profileColor === color ? 'active' : ''}`}
+                    style={{ background: color }}
+                    onClick={() => { setProfileColor(color); localStorage.setItem('profileColor', color); }}
+                  />
+                ))}
+              </div>
+              <div className="profile-modal-actions">
+                <button className="profile-btn-back" onClick={() => setShowProfile(false)}>Indietro</button>
+                <button className="profile-btn-save" onClick={() => setShowProfile(false)}>Salva</button>
+              </div>
             </div>
           </div>
-          <div className="navbar-glow"></div>
-        </nav>
+        )}
         <div className="sticky-bar">
           <h2 className="section-title">CARTELLE</h2>
           <div className="toolbar">
