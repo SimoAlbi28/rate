@@ -1,7 +1,25 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate, useParams } from 'react-router-dom';
 import * as XLSX from 'xlsx';
+import { Home } from 'lucide-react';
 import type { Financing, Payment } from '../types';
+
+const PROFILE_ICONS = [
+  '👤', '👩', '👨', '🧑', '👧', '👦', '🧔', '👩‍💼', '👨‍💼', '🧑‍💻',
+  '👩‍🎓', '👨‍🎓', '🦸', '🧑‍🚀', '🥷', '🐻', '🦊', '🐼', '🦁', '🐸',
+  '👻', '🤖', '👽', '🎃', '😎', '🤠', '🥸', '🧛', '🧙', '🧑‍🎤',
+  '👩‍🔬', '👨‍🍳', '👩‍🚒', '👨‍✈️', '🧑‍⚕️', '💂', '🕵️', '👷', '👸', '🤴',
+  '🦄', '🐶', '🐱', '🐯', '🐨', '🐰', '🦉', '🦋', '🐙', '🐵',
+];
+
+const PROFILE_COLORS = [
+  '#e94560', '#f39c12', '#e67e22', '#2ecc71', '#1abc9c',
+  '#3498db', '#9b59b6', '#e84393', '#636e72', '#2d3436',
+  '#c0392b', '#d35400', '#f1c40f', '#27ae60', '#16a085',
+  '#2980b9', '#8e44ad', '#fd79a8', '#a29bfe', '#00cec9',
+  '#6c5ce7', '#fdcb6e', '#e17055', '#0984e3', '#b2bec3',
+];
 
 interface Props {
   financings: Financing[];
@@ -22,6 +40,20 @@ export default function DetailPage({ financings, onUpdate }: Props) {
   const [dismissedIrregulars, setDismissedIrregulars] = useState(false);
   const [expandedNote, setExpandedNote] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ msg: string; color: string } | null>(null);
+  const showToast = (msg: string, color = '#27ae60') => { setToast({ msg, color }); setTimeout(() => setToast(null), 3500); };
+
+  useEffect(() => {
+    if (confirmDeleteId) {
+      document.body.style.overflow = 'hidden';
+      document.body.style.touchAction = 'none';
+    } else {
+      document.body.style.overflow = '';
+      document.body.style.touchAction = '';
+    }
+    return () => { document.body.style.overflow = ''; document.body.style.touchAction = ''; };
+  }, [confirmDeleteId]);
+
   const [editingPayment, setEditingPayment] = useState<string | null>(null);
   const [editDate, setEditDate] = useState('');
   const [editInt, setEditInt] = useState('');
@@ -31,8 +63,13 @@ export default function DetailPage({ financings, onUpdate }: Props) {
   const [swiping, setSwiping] = useState(false);
   const [swipeOut, setSwipeOut] = useState(false);
   const addPaymentRef = useRef<HTMLDivElement>(null);
-  const profileIcon = localStorage.getItem('profileIcon') || '👤';
-  const profileColor = localStorage.getItem('profileColor') || '#3498db';
+  const [showSwitcher, setShowSwitcher] = useState(false);
+  const [profileIcon, setProfileIcon] = useState(localStorage.getItem('profileIcon') || '👤');
+  const [profileColor, setProfileColor] = useState(localStorage.getItem('profileColor') || '#3498db');
+  const [showProfile, setShowProfile] = useState(false);
+  const [tempProfileIcon, setTempProfileIcon] = useState(profileIcon);
+  const [tempProfileColor, setTempProfileColor] = useState(profileColor);
+  const [showAllProfileIcons, setShowAllProfileIcons] = useState(false);
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
   const swipeDirectionLocked = useRef<'horizontal' | 'vertical' | null>(null);
@@ -95,6 +132,7 @@ export default function DetailPage({ financings, onUpdate }: Props) {
     setPaymentInt(isFixed ? fixedInt : '');
     setPaymentDec(isFixed && fixedDec !== '0' ? fixedDec : '');
     setPaymentNote('');
+    showToast(`Rata di ${val.toFixed(2)} € aggiunta!`);
   };
 
   const deletePayment = (paymentId: string) => {
@@ -202,10 +240,10 @@ export default function DetailPage({ financings, onUpdate }: Props) {
             <img src="/rate-logo.png" alt="Logo" className="navbar-logo-img" onClick={() => navigate('/')} style={{ cursor: 'pointer' }} />
           </div>
           <div className="navbar-center">
-            <h1><span style={{ marginRight: '0.4rem', WebkitTextFillColor: 'initial', background: 'none', filter: 'none' }}>{financing.emoji}</span>{financing.name}</h1>
+            <h1 style={{ cursor: 'pointer' }} onClick={() => setShowSwitcher(!showSwitcher)}><span style={{ marginRight: '0.4rem', WebkitTextFillColor: 'initial', background: 'none', filter: 'none' }}>{financing.emoji}</span>{financing.name}</h1>
             <p className="navbar-tagline">FINANZIAMENTO</p>
           </div>
-          <button className="navbar-profile" style={{ background: profileColor }} onClick={() => navigate('/')}>
+          <button className="navbar-profile" style={{ background: profileColor }} onClick={() => { setTempProfileIcon(profileIcon); setTempProfileColor(profileColor); setShowProfile(true); }}>
             <span>{profileIcon}</span>
           </button>
         </nav>
@@ -213,16 +251,18 @@ export default function DetailPage({ financings, onUpdate }: Props) {
 
       <div className="content">
         {/* RIEPILOGO */}
-        <div className="card section-card">
-          <h3 className="section-heading" style={{ textAlign: 'center' }}>📊 RIEPILOGO</h3>
+        <div className="card section-card" style={{ position: 'relative' }}>
+          <button onClick={() => navigate('/')} style={{ position: 'absolute', right: '1rem', top: '0.75rem', background: 'white', border: '1.5px solid #333', borderRadius: '0.5rem', cursor: 'pointer', padding: '0.5rem', display: 'flex', alignItems: 'center', zIndex: 1 }} title="Torna alla Home"><Home size={24} color="#333" /></button>
+          <h3 className="section-heading" style={{ textAlign: 'left', fontSize: '1.15rem', marginTop: '0.5rem' }}>📊 RIEPILOGO</h3>
           <div className="summary-grid">
             <div className="summary-column">
               {(financing.rateMode || 'variabile') === 'fissa' && (() => {
                 const totalPaidRates = financing.payments.reduce((sum, p) => sum + p.amount, 0);
                 const expectedTotal = financing.payments.length * rateAmount;
                 const balance = financing.payments.length === 0 ? 0 : totalPaidRates - expectedTotal;
-                const label = Math.abs(balance) < 0.01 ? 'Pareggio di bilancio' : balance > 0 ? 'Credito' : 'Debito';
-                const color = Math.abs(balance) < 0.01 ? '#1a7a42' : balance > 0 ? '#1a5276' : '#7b241c';
+                const isComplete = progress >= 100;
+                const label = isComplete ? 'Concluso' : Math.abs(balance) < 0.01 ? 'Pareggio di bilancio' : balance > 0 ? 'Credito' : 'Debito';
+                const color = isComplete ? '#00c853' : Math.abs(balance) < 0.01 ? '#1a7a42' : balance > 0 ? '#1a5276' : '#7b241c';
                 return (
                   <div className="summary-box" style={{ borderColor: color }}>
                     <span className="summary-label">SITUAZIONE</span>
@@ -233,8 +273,18 @@ export default function DetailPage({ financings, onUpdate }: Props) {
                   </div>
                 );
               })()}
+              <div className="summary-box" style={{ borderColor: '#333' }}>
+                <span className="summary-label">RATE RIMANENTI</span>
+                <span className="summary-value" style={{ color: '#333' }}>{Math.max(remainingMonths, 0)}</span>
+              </div>
+              {financing.interestPerRate != null && financing.interestPerRate > 0 && (
+                <div className="summary-box" style={{ borderColor: '#1a5276' }}>
+                  <span className="summary-label" style={{ color: '#1a5276' }}>INTERESSI X RATA</span>
+                  <span className="summary-value" style={{ color: '#1a5276' }}>{financing.interestPerRate.toFixed(2)} €</span>
+                </div>
+              )}
               <div className="summary-box" style={{ borderColor: '#c0392b' }}>
-                <span className="summary-label">TOTALE DA PAGARE</span>
+                <span className="summary-label">TOTALE DA PAGARE (SENZA INTERESSI)</span>
                 <span className="summary-value" style={{ color: '#c0392b' }}>{financing.totalAmount.toFixed(2)} €</span>
               </div>
               {(() => {
@@ -247,46 +297,51 @@ export default function DetailPage({ financings, onUpdate }: Props) {
                       <span className="summary-label">PAGATO (NO INTERESSI)</span>
                       <span className="summary-value" style={{ color: '#27ae60' }}>{(capitalPaid > 0 ? capitalPaid : 0).toFixed(2)} €</span>
                     </div>
-                    <div className="summary-box" style={{ borderColor: '#3498db' }}>
-                      <span className="summary-label">INTERESSI PAGATI</span>
-                      <span className="summary-value" style={{ color: '#3498db' }}>{interestPaid.toFixed(2)} €</span>
-                    </div>
                     <div className="summary-box" style={{ borderColor: '#d4a017' }}>
-                      <span className="summary-label">RESTANTE</span>
-                      <span className="summary-value" style={{ color: '#d4a017' }}>{Math.max(residuo, 0).toFixed(2)} €</span>
+                      <span className="summary-label">RESTANTE SENZA INTERESSI</span>
+                      <span className="summary-value" style={{ color: '#d4a017' }}>{Math.max(financing.totalAmount - (capitalPaid > 0 ? capitalPaid : 0), 0).toFixed(2)} €</span>
                     </div>
                   </>
                 );
               })()}
             </div>
             <div className="summary-column">
-              <div className="summary-box" style={{ borderColor: '#999' }}>
-                <span className="summary-label">RATE PAGATE</span>
-                <span className="summary-value" style={{ color: '#999' }}>{ratesPaid}</span>
-                <span className="summary-sub">su {financing.totalMonths} rate totali</span>
-              </div>
-              <div className="summary-box" style={{ borderColor: '#333' }}>
-                <span className="summary-label">RATE RIMANENTI</span>
-                <span className="summary-value" style={{ color: '#333' }}>{Math.max(remainingMonths, 0)}</span>
-              </div>
               {(financing.rateMode || 'variabile') === 'fissa' && rateAmount > 0 && (
                 <div className="summary-box" style={{ borderColor: '#8e44ad' }}>
                   <span className="summary-label">RATA FISSA</span>
                   <span className="summary-value" style={{ color: '#8e44ad' }}>{rateAmount.toFixed(2)} €</span>
                 </div>
               )}
+              <div className="summary-box" style={{ borderColor: '#666' }}>
+                <span className="summary-label">RATE PAGATE</span>
+                <span className="summary-value" style={{ color: '#666' }}>{ratesPaid}</span>
+                <span className="summary-sub">su {financing.totalMonths} rate totali</span>
+              </div>
               {isFixed && (() => {
                 const interestPerRate = financing.interestPerRate ?? (financing.fixedRateAmount && financing.totalMonths > 0 ? (financing.fixedRateAmount * financing.totalMonths - financing.totalAmount) / financing.totalMonths : 0);
                 if (!interestPerRate || interestPerRate < 0.01) return null;
                 return (
                   <>
                     <div className="summary-box" style={{ borderColor: '#3498db' }}>
-                      <span className="summary-label">INTERESSI X RATA</span>
-                      <span className="summary-value" style={{ color: '#3498db' }}>{interestPerRate.toFixed(2)} €</span>
+                      <span className="summary-label">INTERESSI PAGATI</span>
+                      <span className="summary-value" style={{ color: '#3498db' }}>{(interestPerRate * (financing.payments.length + (financing.initialPaidRates || 0))).toFixed(2)} €</span>
+                    </div>
+                    <div className="summary-box" style={{ borderColor: '#e74c3c' }}>
+                      <span className="summary-label">TOTALE DA PAGARE CON INTERESSI</span>
+                      <span className="summary-value" style={{ color: '#e74c3c' }}>{(financing.totalAmount + interestPerRate * financing.totalMonths).toFixed(2)} €</span>
                     </div>
                     <div className="summary-box" style={{ borderColor: '#1abc9c' }}>
-                      <span className="summary-label">PAGATO + INTERESSI</span>
+                      <span className="summary-label">TOTALE PAGATO CON INTERESSI</span>
                       <span className="summary-value" style={{ color: '#1abc9c' }}>{(paid > 0 ? paid : 0).toFixed(2)} €</span>
+                    </div>
+                    <div className="summary-box" style={{ borderColor: '#f1c40f' }}>
+                      <span className="summary-label">RESTANTE CON INTERESSI</span>
+                      <span className="summary-value" style={{ color: '#f1c40f' }}>{(() => {
+                        const totalRatesPaidR = financing.payments.length + (financing.initialPaidRates || 0);
+                        const capitalRemaining = financing.totalAmount - (paid - interestPerRate * totalRatesPaidR > 0 ? paid - interestPerRate * totalRatesPaidR : 0);
+                        const interestRemaining = interestPerRate * (financing.totalMonths - totalRatesPaidR);
+                        return Math.max(capitalRemaining + interestRemaining, 0).toFixed(2);
+                      })()} €</span>
                     </div>
                   </>
                 );
@@ -332,7 +387,7 @@ export default function DetailPage({ financings, onUpdate }: Props) {
           return (
             <div className="card section-card">
               <h3 className="section-heading" onClick={() => setShowIrregulars(!showIrregulars)} style={{ cursor: 'pointer', textAlign: 'center' }}>
-                ⚠️ RATE IRREGOLARI <span style={{ fontSize: '0.7rem', opacity: 0.6 }}>{showIrregulars ? '▲' : '▼'}</span>
+                ⚠️ IRREGOLARITÀ <span style={{ fontSize: '0.7rem', opacity: 0.6 }}>{showIrregulars ? '▲' : '▼'}</span>
               </h3>
               {showIrregulars && (
                 <>
@@ -341,8 +396,8 @@ export default function DetailPage({ financings, onUpdate }: Props) {
                       <p style={{ textAlign: 'center', color: '#6b9e7d', fontStyle: 'italic', margin: '0.5rem 0' }}>Nessuna irregolarità</p>
                       <hr className="card-separator" />
                       <div className="short-pay-status-label">STATO ATTUALE</div>
-                      <div className="short-pay-balance balance-zero">
-                        <span>Pareggio di bilancio</span>
+                      <div className="short-pay-balance balance-zero" style={progress >= 100 ? { borderColor: '#00c853', color: '#00c853' } : {}}>
+                        <span>{progress >= 100 ? 'Concluso' : 'Pareggio di bilancio'}</span>
                       </div>
                     </>
                   ) : (
@@ -366,7 +421,7 @@ export default function DetailPage({ financings, onUpdate }: Props) {
                       <hr className="card-separator" />
                       <div className="short-pay-status-label">STATO ATTUALE</div>
                       <div className={`short-pay-balance ${isBalanced ? 'balance-zero' : balance > 0 ? 'balance-positive' : 'balance-negative'}`}>
-                        <span>{isBalanced ? 'Pareggio di bilancio' : balance > 0 ? 'Credito:' : 'Debito rata:'}</span>
+                        <span>{isBalanced ? (progress >= 100 ? 'Concluso' : 'Pareggio di bilancio') : balance > 0 ? 'Credito:' : 'Debito rata:'}</span>
                         {!isBalanced && <span>{balance > 0 ? '+' : '-'}{Math.abs(balance).toFixed(2)} €</span>}
                       </div>
                       {!isBalanced && balance < 0 && (
@@ -405,12 +460,12 @@ export default function DetailPage({ financings, onUpdate }: Props) {
                 <>
                   <div className="short-pay-status-label">STATO ATTUALE</div>
                   {dismissedIrregulars || irregularPayments.length === 0 ? (
-                    <div className="short-pay-balance balance-zero">
-                      <span>Pareggio di bilancio</span>
+                    <div className="short-pay-balance balance-zero" style={progress >= 100 ? { borderColor: '#00c853', color: '#00c853' } : {}}>
+                      <span>{progress >= 100 ? 'Concluso' : 'Pareggio di bilancio'}</span>
                     </div>
                   ) : (
-                    <div className={`short-pay-balance ${isBalanced ? 'balance-zero' : balance > 0 ? 'balance-positive' : 'balance-negative'}`}>
-                      <span>{isBalanced ? 'Pareggio di bilancio' : balance > 0 ? 'Credito:' : 'Debito rata:'}</span>
+                    <div className={`short-pay-balance ${isBalanced ? 'balance-zero' : balance > 0 ? 'balance-positive' : 'balance-negative'}`} style={isBalanced && progress >= 100 ? { borderColor: '#00c853', color: '#00c853' } : {}}>
+                      <span>{isBalanced ? (progress >= 100 ? 'Concluso' : 'Pareggio di bilancio') : balance > 0 ? 'Credito:' : 'Debito rata:'}</span>
                       {!isBalanced && <span>{balance > 0 ? '+' : '-'}{Math.abs(balance).toFixed(2)} €</span>}
                     </div>
                   )}
@@ -641,21 +696,98 @@ export default function DetailPage({ financings, onUpdate }: Props) {
         </div>
       )}
 
-      {confirmDeleteId && (
-        <div className="modal-overlay" onClick={() => setConfirmDeleteId(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
+      {showSwitcher && createPortal(
+        <div style={{ position: 'fixed', inset: 0, zIndex: 99998 }} onClick={() => setShowSwitcher(false)}>
+          <div style={{ position: 'absolute', top: '70px', left: '50%', transform: 'translateX(-50%)', background: 'white', borderRadius: '0.75rem', boxShadow: '0 4px 20px rgba(0,0,0,0.25)', minWidth: '220px', overflow: 'hidden' }} onClick={(e) => e.stopPropagation()}>
+            {financings.filter(f => f.id !== id).sort((a, b) => a.name.localeCompare(b.name)).map(f => (
+              <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 1rem', cursor: 'pointer', borderBottom: '1px solid #eee', flex: 1 }}
+                onClick={() => { setShowSwitcher(false); navigate(`/detail/${f.id}`); }}>
+                <span style={{ fontSize: '1.3rem' }}>{f.emoji}</span>
+                <span style={{ fontWeight: 600, color: '#2d5a3d', fontSize: '0.95rem', display: 'flex', justifyContent: 'space-between', flex: 1 }}>{f.name.charAt(0).toUpperCase() + f.name.slice(1)} <span style={{ color: (f.rateMode || 'variabile') === 'fissa' ? '#8e44ad' : '#e91e8a', fontWeight: 400, fontSize: '0.8rem' }}>({(f.rateMode || 'variabile') === 'fissa' ? 'Fissa' : 'Variabile'})</span></span>
+              </div>
+            ))}
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {confirmDeleteId && createPortal(
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999, touchAction: 'none', overscrollBehavior: 'contain' }} onClick={() => setConfirmDeleteId(null)} onTouchMove={(e) => e.preventDefault()}>
+          <div className="modal" style={{ maxWidth: '320px' }} onClick={(e) => e.stopPropagation()}>
             <h2 className="modal-title">Conferma eliminazione</h2>
             <p style={{ textAlign: 'center', color: '#666', margin: '1rem 0' }}>
               Vuoi eliminare il pagamento di <strong>{financing.payments.find(p => p.id === confirmDeleteId)?.amount.toFixed(2)} €</strong> in data <strong>{financing.payments.find(p => p.id === confirmDeleteId) ? new Date(financing.payments.find(p => p.id === confirmDeleteId)!.date).toLocaleDateString('it-IT') : ''}</strong>?
             </p>
             <div className="modal-actions">
               <button className="btn-secondary" onClick={() => setConfirmDeleteId(null)}>Annulla</button>
-              <button className="btn-primary" style={{ background: '#c0392b' }} onClick={() => { deletePayment(confirmDeleteId); setConfirmDeleteId(null); }}>Elimina</button>
+              <button className="btn-primary" style={{ background: '#c0392b' }} onClick={() => { const p = financing.payments.find(p => p.id === confirmDeleteId); deletePayment(confirmDeleteId); setConfirmDeleteId(null); showToast(`Pagamento di ${p?.amount.toFixed(2)} € eliminato!`, '#c0392b'); }}>Elimina</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
+    {toast && (
+      <div className="toast" style={{ background: toast.color }}>{toast.msg}</div>
+    )}
+    {showProfile && (
+      <div className="modal-overlay" onClick={() => { setProfileIcon(tempProfileIcon); setProfileColor(tempProfileColor); setShowProfile(false); }}>
+        <div className="profile-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="profile-modal-header">
+            <h2>Il tuo profilo</h2>
+            <button className="profile-modal-close" onClick={() => { setProfileIcon(tempProfileIcon); setProfileColor(tempProfileColor); setShowProfile(false); }}>&times;</button>
+          </div>
+          <div className="profile-modal-content">
+            <div className="profile-preview" style={{ background: profileColor }}>
+              <span>{profileIcon}</span>
+            </div>
+            <h3 className="profile-section-title">Scegli icona</h3>
+            <div className="profile-grid">
+              {(() => {
+                const COLS = 5;
+                const VISIBLE_ROWS = 3;
+                const visibleCount = COLS * VISIBLE_ROWS;
+                const icons = showAllProfileIcons
+                  ? PROFILE_ICONS
+                  : (() => {
+                      const idx = PROFILE_ICONS.indexOf(profileIcon);
+                      if (idx < visibleCount) return PROFILE_ICONS.slice(0, visibleCount);
+                      const reordered = [profileIcon, ...PROFILE_ICONS.filter((i) => i !== profileIcon)];
+                      return reordered.slice(0, visibleCount);
+                    })();
+                return icons.map((icon) => (
+                  <button
+                    key={icon}
+                    className={`profile-grid-btn ${profileIcon === icon ? 'active' : ''}`}
+                    onClick={() => setProfileIcon(icon)}
+                  >
+                    {icon}
+                  </button>
+                ));
+              })()}
+            </div>
+            <button className="profile-show-more" onClick={() => setShowAllProfileIcons(!showAllProfileIcons)}>
+              {showAllProfileIcons ? 'Mostra meno' : 'Mostra di più'}
+            </button>
+            <h3 className="profile-section-title">Colore sfondo</h3>
+            <div className="profile-colors">
+              {PROFILE_COLORS.map((color) => (
+                <button
+                  key={color}
+                  className={`profile-color-btn ${profileColor === color ? 'active' : ''}`}
+                  style={{ background: color }}
+                  onClick={() => setProfileColor(color)}
+                />
+              ))}
+            </div>
+          </div>
+          <div className="profile-modal-actions">
+            <button className="profile-btn-back" onClick={() => { setProfileIcon(tempProfileIcon); setProfileColor(tempProfileColor); setShowProfile(false); }}>Indietro</button>
+            <button className="profile-btn-save" onClick={() => { localStorage.setItem('profileIcon', profileIcon); localStorage.setItem('profileColor', profileColor); setShowProfile(false); }}>Salva</button>
+          </div>
+        </div>
+      </div>
+    )}
     </>
   );
 }

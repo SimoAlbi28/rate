@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Plus, Search, X } from 'lucide-react';
 import type { Financing, RateType } from '../types';
 
 interface Props {
@@ -37,8 +38,10 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
   const [showAllEmojis, setShowAllEmojis] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [showSearch, setShowSearch] = useState(false);
+  const [searchClosing, setSearchClosing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterType, setFilterType] = useState<'tutti' | 'debito' | 'credito'>('tutti');
+  const [filterType, setFilterType] = useState<'tutti' | 'debito' | 'credito' | 'pareggio' | 'concluso'>('tutti');
+  const [filterRateMode, setFilterRateMode] = useState<'tutti' | 'fissa' | 'variabile'>('tutti');
   const [showProfile, setShowProfile] = useState(false);
   const [profileIcon, setProfileIcon] = useState(() => localStorage.getItem('profileIcon') || '👤');
   const [profileColor, setProfileColor] = useState(() => localStorage.getItem('profileColor') || '#3498db');
@@ -122,11 +125,41 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
     }
     setEditRateType(f.rateType || 'mensile');
     setEditRateMode(f.rateMode || 'variabile');
-    setEditInitialPaidRates((f.initialPaidRates || 0).toString());
+    if (f.fixedRateAmount && f.fixedRateAmount > 0) {
+      const frInt = Math.floor(f.fixedRateAmount);
+      const frDec = Math.round((f.fixedRateAmount - frInt) * 100);
+      setEditFixedRateInt(frInt.toString());
+      setEditFixedRateDec(frDec > 0 ? frDec.toString() : '');
+    } else {
+      setEditFixedRateInt('');
+      setEditFixedRateDec('');
+    }
+    const totalPaidRates = (f.initialPaidRates || 0) + f.payments.length;
+    setEditInitialPaidRates(totalPaidRates.toString());
+    // Build single rates array: initial rates + payment rates
+    const singleRatesArr: { int: string; dec: string }[] = [];
+    // Initial paid rates (use fixedRateAmount or divide initialPaid evenly)
+    const initRateCount = f.initialPaidRates || 0;
+    if (initRateCount > 0) {
+      const perRate = f.fixedRateAmount || ((f.initialPaid || 0) / initRateCount);
+      for (let i = 0; i < initRateCount; i++) {
+        const ri = Math.floor(perRate);
+        const rd = Math.round((perRate - ri) * 100);
+        singleRatesArr.push({ int: ri.toString(), dec: rd > 0 ? rd.toString() : '' });
+      }
+    }
+    // Payment rates
+    for (const p of f.payments) {
+      const pi = Math.floor(p.amount);
+      const pd = Math.round((p.amount - pi) * 100);
+      singleRatesArr.push({ int: pi.toString(), dec: pd > 0 ? pd.toString() : '' });
+    }
+    setEditSingleRates(singleRatesArr);
     setEditStartDate(f.startDate || '');
     setEditEndDate(f.endDate || '');
-    const ipInt = Math.floor(f.initialPaid || 0);
-    const ipDec = Math.round(((f.initialPaid || 0) - ipInt) * 100);
+    const totalPaid = (f.initialPaid || 0) + f.payments.reduce((s, p) => s + p.amount, 0);
+    const ipInt = Math.floor(totalPaid);
+    const ipDec = Math.round((totalPaid - ipInt) * 100);
     setEditInitialPaidInt(ipInt > 0 ? ipInt.toString() : '');
     setEditInitialPaidDec(ipDec > 0 ? ipDec.toString() : '');
   };
@@ -271,6 +304,15 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
   const filteredFinancings = financings
     .filter(f => {
       if (searchQuery && !f.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+      if (filterRateMode === 'fissa' && (f.rateMode || 'variabile') !== 'fissa') return false;
+      if (filterRateMode === 'variabile' && (f.rateMode || 'variabile') !== 'variabile') return false;
+      if (filterType === 'tutti') return true;
+      const paid = f.payments.reduce((s, p) => s + p.amount, 0) + (f.initialPaid || 0);
+      const intPaid = f.interestPerRate ? f.interestPerRate * (f.payments.length + (f.initialPaidRates || 0)) : 0;
+      const capitalPaid = Math.max(paid - intPaid, 0);
+      const progress = f.totalAmount > 0 ? (capitalPaid / f.totalAmount) * 100 : 0;
+      if (filterType === 'concluso') return progress >= 100;
+      if (filterType === 'pareggio') return progress < 100 && Math.abs(getBalance(f)) < 0.01;
       if (filterType === 'debito') return getBalance(f) < 0;
       if (filterType === 'credito') return getBalance(f) > 0;
       return true;
@@ -319,7 +361,7 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
 
   const showToast = (msg: string) => {
     setToast(msg);
-    setTimeout(() => setToast(null), 2500);
+    setTimeout(() => setToast(null), 3500);
   };
 
   const getVisibleEmojis = (selected: string) => {
@@ -524,45 +566,99 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
         <div className="sticky-bar">
           <h2 className="section-title">CARTELLE</h2>
           <div className="toolbar">
-            <button className="toolbar-btn toolbar-btn-create" onClick={() => setShowModal(true)}>
-              + Crea
+            <button className="toolbar-btn toolbar-btn-create" onClick={() => setShowModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+              <Plus size={18} /> Crea
             </button>
             <button
               className={`toolbar-btn toolbar-btn-search ${showSearch ? 'active' : ''}`}
-              onClick={() => { setShowSearch(!showSearch); if (showSearch) { setSearchQuery(''); setFilterType('tutti'); } }}
+              onClick={() => {
+                if (showSearch) {
+                  setSearchClosing(true);
+                  setTimeout(() => { setShowSearch(false); setSearchClosing(false); }, 120);
+                } else {
+                  setShowSearch(true);
+                }
+              }}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             >
-              🔍
+              <Search size={18} />
             </button>
+            {!showSearch && (searchQuery || filterType !== 'tutti' || filterRateMode !== 'tutti') && (
+              <button
+                onClick={() => { setSearchQuery(''); setFilterType('tutti'); setFilterRateMode('tutti'); }}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#c0392b', border: 'none', borderRadius: '0.75rem', cursor: 'pointer', padding: '0.5rem 0.85rem', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+                title="Reset filtri"
+              >
+                <X size={18} color="white" />
+              </button>
+            )}
           </div>
           {showSearch && (
-            <div className="search-bar">
-              <input
-                type="text"
-                placeholder="Cerca per nome..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="search-input"
-                autoFocus
-              />
-              <div className="filter-buttons">
+            <div className={`search-bar ${searchClosing ? 'closing' : ''}`}>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="text"
+                  placeholder="Cerca per nome..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="search-input"
+                  style={{ paddingRight: '2.5rem' }}
+                  autoFocus
+                />
                 <button
-                  className={`filter-btn ${filterType === 'tutti' ? 'active' : ''}`}
-                  onClick={() => setFilterType('tutti')}
+                  style={{ position: 'absolute', right: '0.75rem', top: '-6px', bottom: 0, margin: 'auto', height: 'fit-content', background: 'none', border: 'none', cursor: 'pointer', padding: '0.2rem', display: 'flex', alignItems: 'center', opacity: (searchQuery || filterType !== 'tutti' || filterRateMode !== 'tutti') ? 1 : 0, pointerEvents: (searchQuery || filterType !== 'tutti' || filterRateMode !== 'tutti') ? 'auto' : 'none' }}
+                  onClick={() => { setSearchQuery(''); setFilterType('tutti'); setFilterRateMode('tutti'); }}
+                  title="Reset filtri"
                 >
-                  Tutti
+                  <X size={18} color="#999" />
                 </button>
-                <button
-                  className={`filter-btn filter-debito ${filterType === 'debito' ? 'active' : ''}`}
-                  onClick={() => setFilterType(filterType === 'debito' ? 'tutti' : 'debito')}
-                >
-                  Debito
-                </button>
-                <button
-                  className={`filter-btn filter-credito ${filterType === 'credito' ? 'active' : ''}`}
-                  onClick={() => setFilterType(filterType === 'credito' ? 'tutti' : 'credito')}
-                >
-                  Credito
-                </button>
+              </div>
+              <div style={{ overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch', msOverflowStyle: 'none', scrollbarWidth: 'none' }}>
+                <div style={{ display: 'flex', gap: '0.35rem', whiteSpace: 'nowrap', minWidth: 'min-content' }}>
+                  <button
+                    className={`filter-btn ${filterRateMode === 'fissa' ? 'active' : ''}`}
+                    style={filterRateMode === 'fissa' ? { background: '#8e44ad', color: 'white', borderColor: '#8e44ad' } : { color: '#8e44ad', borderColor: '#8e44ad' }}
+                    onClick={() => setFilterRateMode(filterRateMode === 'fissa' ? 'tutti' : 'fissa')}
+                  >
+                    Fissa
+                  </button>
+                  <button
+                    className={`filter-btn ${filterRateMode === 'variabile' ? 'active' : ''}`}
+                    style={filterRateMode === 'variabile' ? { background: '#e91e8a', color: 'white', borderColor: '#e91e8a' } : { color: '#e91e8a', borderColor: '#e91e8a' }}
+                    onClick={() => setFilterRateMode(filterRateMode === 'variabile' ? 'tutti' : 'variabile')}
+                  >
+                    Variabile
+                  </button>
+                  <span style={{ width: '1px', height: '1.5rem', background: '#ccc', flexShrink: 0, alignSelf: 'center' }} />
+                  <button
+                    className={`filter-btn ${filterType === 'pareggio' ? 'active' : ''}`}
+                    style={filterType === 'pareggio' ? { background: '#27ae60', color: 'white', borderColor: '#27ae60' } : { color: '#27ae60', borderColor: '#27ae60' }}
+                    onClick={() => setFilterType(filterType === 'pareggio' ? 'tutti' : 'pareggio')}
+                  >
+                    Pareggio
+                  </button>
+                  <button
+                    className={`filter-btn ${filterType === 'debito' ? 'active' : ''}`}
+                    style={filterType === 'debito' ? { background: '#c0392b', color: 'white', borderColor: '#c0392b' } : { color: '#c0392b', borderColor: '#c0392b' }}
+                    onClick={() => setFilterType(filterType === 'debito' ? 'tutti' : 'debito')}
+                  >
+                    Debito
+                  </button>
+                  <button
+                    className={`filter-btn ${filterType === 'credito' ? 'active' : ''}`}
+                    style={filterType === 'credito' ? { background: '#3498db', color: 'white', borderColor: '#3498db' } : { color: '#3498db', borderColor: '#3498db' }}
+                    onClick={() => setFilterType(filterType === 'credito' ? 'tutti' : 'credito')}
+                  >
+                    Credito
+                  </button>
+                  <button
+                    className={`filter-btn ${filterType === 'concluso' ? 'active' : ''}`}
+                    style={filterType === 'concluso' ? { background: '#00c853', color: 'white', borderColor: '#00c853' } : { color: '#00c853', borderColor: '#00c853' }}
+                    onClick={() => setFilterType(filterType === 'concluso' ? 'tutti' : 'concluso')}
+                  >
+                    Concluso
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -653,17 +749,45 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                     const capitalPaid = paid - interestPaid;
                     return (
                       <>
-                        <div className="card-info card-info-red"><span>Da pagare:</span><span>{f.totalAmount.toFixed(2)} €</span></div>
-                        <div className="card-info card-info-green"><span>Pagato:</span><span>{capitalPaid > 0 ? capitalPaid.toFixed(2) : '0.00'} €</span></div>
-                        {f.interestPerRate != null && f.interestPerRate > 0 && (
-                          <div className="card-info" style={{ color: '#3498db' }}><span>Interessi pagati:</span><span>{interestPaid.toFixed(2)} €</span></div>
+                        {(f.rateMode || 'variabile') === 'fissa' && f.interestPerRate != null && f.interestPerRate > 0 ? (
+                          <>
+                            <div className="card-info-center" style={{ color: '#3498db', fontWeight: 'bold', textTransform: 'uppercase' as const }}>Senza interessi</div>
+                            <div className="card-info card-info-red"><span>Totale da pagare:</span><span>{f.totalAmount.toFixed(2)} €</span></div>
+                            <div className="card-info card-info-green"><span>Totale Pagato:</span><span>{capitalPaid > 0 ? capitalPaid.toFixed(2) : '0.00'} €</span></div>
+                            <hr className="card-separator" />
+                            <div className="card-info card-info-yellow"><span>Restante:</span><span>{(() => {
+                              const r = f.totalAmount - (capitalPaid > 0 ? capitalPaid : 0);
+                              return r > 0 ? r.toFixed(2) : '0.00';
+                            })()} €</span></div>
+                            <hr style={{ border: 'none', borderTop: '1px solid #000', margin: '6px 0', opacity: 0.3 }} />
+                            <div className="card-info-center" style={{ color: '#3498db', fontWeight: 'bold', textTransform: 'uppercase' as const }}>Con interessi</div>
+                            <div className="card-info" style={{ color: '#e74c3c' }}><span>Totale da pagare:</span><span>{(f.totalAmount + f.interestPerRate * f.totalMonths).toFixed(2)} €</span></div>
+                            <div className="card-info" style={{ color: '#1abc9c' }}><span>Totale Pagato:</span><span>{paid > 0 ? paid.toFixed(2) : '0.00'} €</span></div>
+                            <hr className="card-separator" />
+                            <div className="card-info" style={{ color: '#f1c40f' }}><span>Restante:</span><span>{(() => {
+                              const capitalRemaining = f.totalAmount - (capitalPaid > 0 ? capitalPaid : 0);
+                              const interestRemaining = f.interestPerRate ? f.interestPerRate * (f.totalMonths - totalRatesPaid) : 0;
+                              const restante = capitalRemaining + interestRemaining;
+                              return restante > 0 ? restante.toFixed(2) : '0.00';
+                            })()} €</span></div>
+                            <hr style={{ border: 'none', borderTop: '1px solid #000', margin: '6px 0', opacity: 0.3 }} />
+                          </>
+                        ) : (
+                          <>
+                            <div className="card-info card-info-red"><span>Da pagare:</span><span>{f.totalAmount.toFixed(2)} €</span></div>
+                            <div className="card-info card-info-green"><span>Pagato:</span><span>{capitalPaid > 0 ? capitalPaid.toFixed(2) : '0.00'} €</span></div>
+                            {f.interestPerRate != null && f.interestPerRate > 0 && (
+                              <div className="card-info" style={{ color: '#3498db' }}><span>Interessi pagati:</span><span>{interestPaid.toFixed(2)} €</span></div>
+                            )}
+                            <hr className="card-separator" />
+                            <div className="card-info card-info-yellow"><span>Restante:</span><span>{residuo > 0 ? residuo.toFixed(2) : '0.00'} €</span></div>
+                          </>
                         )}
-                        <hr className="card-separator" />
-                        <div className="card-info card-info-yellow"><span>Restante:</span><span>{residuo > 0 ? residuo.toFixed(2) : '0.00'} €</span></div>
                       </>
                     );
                   })()}
                 </div>
+                <div className="card-info-center" style={{ color: '#333', fontWeight: 'bold', fontSize: '0.75rem', letterSpacing: '1px' }}>AVANZAMENTO</div>
                 {(() => {
                   const totalRatesPaidProg = f.payments.length + (f.initialPaidRates || 0);
                   const interestPaidProg = f.interestPerRate ? f.interestPerRate * totalRatesPaidProg : 0;
@@ -687,6 +811,22 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                   );
                 })()}
                 <hr className="card-separator" />
+                {(f.rateMode || 'variabile') === 'fissa' && f.interestPerRate != null && f.interestPerRate > 0 && (() => {
+                  const totalRatesPaidInt = f.payments.length + (f.initialPaidRates || 0);
+                  const interestPaidInt = f.interestPerRate * totalRatesPaidInt;
+                  return (
+                    <>
+                      <div className="card-info-center" style={{ background: 'linear-gradient(to right, #1a5276, #3498db)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', fontWeight: 'bold', fontSize: '0.75rem', letterSpacing: '1px', textTransform: 'uppercase' as const }}>INTERESSI</div>
+                      <div className="card-info-center" style={{ color: '#1a5276' }}>
+                        Interesse x rata: {f.interestPerRate!.toFixed(2)} €
+                      </div>
+                      <div className="card-info-center" style={{ color: '#3498db' }}>
+                        Interessi Totali Pagati: {interestPaidInt.toFixed(2)} €
+                      </div>
+                    </>
+                  );
+                })()}
+                <hr className="card-separator" />
                 <div className={`card-rate-mode ${(f.rateMode || 'variabile') === 'fissa' ? 'mode-fissa' : 'mode-variabile'}`}>
                   Rata {((f.rateMode || 'variabile').charAt(0).toUpperCase() + (f.rateMode || 'variabile').slice(1))}
                 </div>
@@ -700,6 +840,11 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                     <>
                       <div className="card-rate-info-row">
                         <div className="card-rate-info">
+                          {f.interestPerRate != null && f.interestPerRate > 0 && (
+                            <div style={{ fontSize: '0.7rem', color: '#888', marginBottom: '2px' }}>
+                              {(rateAmount - f.interestPerRate).toFixed(2)} € + {f.interestPerRate.toFixed(2)} € <span style={{ color: '#1a5276' }}>(interessi)</span>
+                            </div>
+                          )}
                           {rateAmount.toFixed(2)} € <span className="card-rate-type">{f.rateType.charAt(0).toUpperCase() + f.rateType.slice(1)}</span>
                         </div>
                         {hasIrregular && !dismissedAlerts.has(f.id) && (
@@ -1150,7 +1295,7 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
               onChange={(e) => setEditName(e.target.value)}
               autoFocus
             />
-            <p className="modal-field-label">Importo totale da pagare <span className="required-tag">*</span></p>
+            <p className="modal-field-label">Importo totale da pagare (senza interessi) <span className="required-tag">*</span></p>
             <div className="amount-row">
               <input
                 type="number"
@@ -1168,52 +1313,12 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
               />
               <span className="amount-currency">€</span>
             </div>
-            <p className="modal-field-label">Durata <span className="required-tag">*</span></p>
-            <div className="duration-row">
-              <select
-                className="duration-select"
-                value={editDurationType}
-                onChange={(e) => handleEditDurationType(e.target.value as 'mesi' | 'anni')}
-              >
-                <option value="mesi">Mesi</option>
-                <option value="anni">Anni</option>
-              </select>
-              <input
-                type="number"
-                placeholder="Durata"
-                value={editDuration}
-                onChange={(e) => handleEditDuration(e.target.value)}
-              />
-            </div>
-            {(parseInt(editDuration) || 0) > 0 && (
-              <>
-                <p className="modal-field-label">Periodo <span className="optional-tag">(opzionale)</span></p>
-                <div className="date-row">
-                  <div className="date-field">
-                    <label>Inizio</label>
-                    <input
-                      type="date"
-                      value={editStartDate}
-                      onChange={(e) => handleEditStartDate(e.target.value)}
-                    />
-                  </div>
-                  <div className="date-field">
-                    <label>Fine</label>
-                    <input
-                      type="date"
-                      value={editEndDate}
-                      onChange={(e) => handleEditEndDate(e.target.value)}
-                    />
-                  </div>
-                </div>
-              </>
-            )}
-            <p className="modal-field-label">Tipo di rata <span className="required-tag">*</span></p>
-            <div className="rate-type-row">
+            <p className="modal-field-label" style={{ opacity: 0.5 }}>Tipo di rata</p>
+            <div className="rate-type-row" style={{ opacity: 0.5, pointerEvents: 'none' }}>
               <select
                 className="modal-select"
                 value={editRateType}
-                onChange={(e) => setEditRateType(e.target.value as RateType)}
+                disabled
               >
                 <option value="mensile">Mensile</option>
                 <option value="bimestrale">Bimestrale</option>
@@ -1225,28 +1330,29 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
               <select
                 className="modal-select"
                 value={editRateMode}
-                onChange={(e) => {
-                  const mode = e.target.value as 'fissa' | 'variabile';
-                  setEditRateMode(mode);
-                  if (mode === 'fissa') {
-                    const amount = parseFloat(`${editAmountInt || '0'}.${editAmountDec || '0'}`);
-                    const dur = parseInt(editDuration) || 0;
-                    if (amount > 0 && dur > 0) {
-                      const rata = amount / dur;
-                      setEditFixedRateInt(Math.floor(rata).toString());
-                      const dec = Math.round((rata - Math.floor(rata)) * 100);
-                      setEditFixedRateDec(dec > 0 ? dec.toString() : '');
-                    }
-                  }
-                }}
+                disabled
               >
                 <option value="variabile">Variabile</option>
                 <option value="fissa">Fissa</option>
               </select>
             </div>
+            <p className="modal-field-label">N° Rate Totali <span className="required-tag">*</span></p>
+            <div className="inline-field" style={{ justifyContent: 'center' }}>
+              <div className="stepper">
+                <button type="button" className="stepper-btn stepper-btn-minus" {...stepperMinus(() => parseInt(editDuration) || 0, (v: string) => handleEditDuration(v))}>−</button>
+                <input
+                  type="number"
+                  min="0"
+                  value={editDuration}
+                  onChange={(e) => handleEditDuration(e.target.value)}
+                  className="stepper-input"
+                />
+                <button type="button" className="stepper-btn stepper-btn-plus" {...stepperPlus(() => parseInt(editDuration) || 0, (v: string) => handleEditDuration(v))}>+</button>
+              </div>
+            </div>
             {editRateMode === 'fissa' && (
               <>
-                <p className="modal-field-label">Importo singola rata</p>
+                <p className="modal-field-label">Importo singola rata (compresa d'interessi)</p>
                 <div className="amount-row">
                   <input
                     type="number"
@@ -1287,18 +1393,41 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                 </div>
               </>
             )}
-            <div className="inline-field">
-              <p className="modal-field-label">N° Rate già pagate <span className="optional-tag">(opzionale)</span></p>
+            {(parseInt(editDuration) || 0) > 0 && (
+              <>
+                <p className="modal-field-label">Periodo <span className="optional-tag">(opzionale)</span></p>
+                <div className="date-row">
+                  <div className="date-field">
+                    <label>Inizio</label>
+                    <input
+                      type="date"
+                      value={editStartDate}
+                      onChange={(e) => handleEditStartDate(e.target.value)}
+                    />
+                  </div>
+                  <div className="date-field">
+                    <label>Fine</label>
+                    <input
+                      type="date"
+                      value={editEndDate}
+                      onChange={(e) => handleEditEndDate(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+            <div className="inline-field" style={{ opacity: 0.5, pointerEvents: 'none' }}>
+              <p className="modal-field-label">N° Rate già pagate</p>
               <div className="stepper">
-                <button type="button" className="stepper-btn stepper-btn-minus" {...stepperMinus(() => parseInt(editInitialPaidRates) || 0, updateEditPaidRatesCount)}>−</button>
+                <button type="button" className="stepper-btn stepper-btn-minus" disabled>−</button>
                 <input
                   type="number"
                   min="0"
                   value={editInitialPaidRates}
-                  onChange={(e) => updateEditPaidRatesCount(e.target.value)}
+                  disabled
                   className="stepper-input"
                 />
-                <button type="button" className="stepper-btn stepper-btn-plus" {...stepperPlus(() => parseInt(editInitialPaidRates) || 0, updateEditPaidRatesCount)}>+</button>
+                <button type="button" className="stepper-btn stepper-btn-plus" disabled>+</button>
               </div>
             </div>
             {(parseInt(editInitialPaidRates) || 0) > 0 && (
@@ -1319,63 +1448,58 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                     Totale
                   </button>
                 </div>
-                <div className="paid-carousel">
-                  <div className={`paid-carousel-track ${editPaidMode === 'singola' ? 'show-left' : 'show-right'}`}>
-                    <div className="paid-carousel-panel">
-                      <div className="single-rates-list">
-                        {editSingleRates.map((r, i) => (
-                          <div key={i} className="single-rate-card">
-                            <span className="single-rate-label">Rata {i + 1}</span>
-                            <div className="amount-row">
-                              <input
-                                type="number"
-                                placeholder="Euro"
-                                value={r.int}
-                                onChange={(e) => {
-                                  const arr = [...editSingleRates];
-                                  arr[i] = { ...arr[i], int: e.target.value };
-                                  setEditSingleRates(arr);
-                                }}
-                              />
-                              <span className="amount-sep">,</span>
-                              <input
-                                type="number"
-                                placeholder="Cent"
-                                value={r.dec}
-                                onChange={(e) => {
-                                  const arr = [...editSingleRates];
-                                  arr[i] = { ...arr[i], dec: e.target.value.slice(0, 2) };
-                                  setEditSingleRates(arr);
-                                }}
-                                className="amount-dec"
-                              />
-                              <span className="amount-currency">€</span>
-                            </div>
-                          </div>
-                        ))}
+                {editPaidMode === 'singola' ? (
+                  <div className="single-rates-list">
+                    {editSingleRates.map((r, i) => (
+                      <div key={i} className="single-rate-card">
+                        <span className="single-rate-label">Rata {i + 1}</span>
+                        <div className="amount-row">
+                          <input
+                            type="number"
+                            placeholder="Euro"
+                            value={r.int}
+                            onChange={(e) => {
+                              const arr = [...editSingleRates];
+                              arr[i] = { ...arr[i], int: e.target.value };
+                              setEditSingleRates(arr);
+                            }}
+                          />
+                          <span className="amount-sep">,</span>
+                          <input
+                            type="number"
+                            placeholder="Cent"
+                            value={r.dec}
+                            onChange={(e) => {
+                              const arr = [...editSingleRates];
+                              arr[i] = { ...arr[i], dec: e.target.value.slice(0, 2) };
+                              setEditSingleRates(arr);
+                            }}
+                            className="amount-dec"
+                          />
+                          <span className="amount-currency">€</span>
+                        </div>
                       </div>
-                    </div>
-                    <div className="paid-carousel-panel">
-                      <div className="amount-row">
-                        <input
-                          type="number"
-                          placeholder="Euro"
-                          value={editInitialPaidInt}
-                          onChange={(e) => setEditInitialPaidInt(e.target.value)}
-                        />
-                        <span className="amount-sep">,</span>
-                        <input
-                          type="number"
-                          placeholder="Cent"
-                          value={editInitialPaidDec}
-                          onChange={(e) => setEditInitialPaidDec(e.target.value.slice(0, 2))}
-                          className="amount-dec"
-                        />
-                        <span className="amount-currency">€</span>
-                      </div>
-                    </div>
+                    ))}
                   </div>
-                </div>
+                ) : (
+                  <div className="amount-row">
+                    <input
+                      type="number"
+                      placeholder="Euro"
+                      value={editInitialPaidInt}
+                      onChange={(e) => setEditInitialPaidInt(e.target.value)}
+                    />
+                    <span className="amount-sep">,</span>
+                    <input
+                      type="number"
+                      placeholder="Cent"
+                      value={editInitialPaidDec}
+                      onChange={(e) => setEditInitialPaidDec(e.target.value.slice(0, 2))}
+                      className="amount-dec"
+                    />
+                    <span className="amount-currency">€</span>
+                  </div>
+                )}
               </>
             )}
             <p className="emoji-picker-title">Icona</p>
