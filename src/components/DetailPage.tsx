@@ -37,7 +37,12 @@ export default function DetailPage({ financings, onUpdate }: Props) {
   const [originalRate, setOriginalRate] = useState('');
   const [ratePreFilled, setRatePreFilled] = useState(false);
   const [showIrregulars, setShowIrregulars] = useState(false);
-  const [dismissedIrregulars, setDismissedIrregulars] = useState(false);
+  const [dismissedIrregulars, setDismissedIrregulars] = useState(() => {
+    try {
+      const saved = localStorage.getItem('dismissedAlerts');
+      return saved ? new Set(JSON.parse(saved)).has(id) : false;
+    } catch { return false; }
+  });
   const [expandedNote, setExpandedNote] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ msg: string; color: string } | null>(null);
@@ -93,7 +98,6 @@ export default function DetailPage({ financings, onUpdate }: Props) {
 
   const paymentsPaid = financing.payments.reduce((s, p) => s + p.amount, 0);
   const paid = paymentsPaid + (financing.initialPaid || 0);
-  const residuo = financing.totalAmount - paid;
   const rateAmount = financing.fixedRateAmount || (financing.totalMonths > 0 ? financing.totalAmount / financing.totalMonths : 0);
   const ratesPaid = (rateAmount > 0 ? Math.floor(paid / rateAmount) : 0) + (financing.initialPaidRates || 0);
   const remainingMonths = financing.totalMonths - ratesPaid;
@@ -136,10 +140,22 @@ export default function DetailPage({ financings, onUpdate }: Props) {
   };
 
   const deletePayment = (paymentId: string) => {
+    const newPayments = financing.payments.filter((p) => p.id !== paymentId);
     onUpdate({
       ...financing,
-      payments: financing.payments.filter((p) => p.id !== paymentId),
+      payments: newPayments,
     });
+    // Clear dismissed irregularities since payments changed
+    setDismissedIrregulars(false);
+    try {
+      const saved = localStorage.getItem('dismissedAlerts');
+      const set = saved ? new Set(JSON.parse(saved)) : new Set();
+      set.delete(id);
+      localStorage.setItem('dismissedAlerts', JSON.stringify([...set]));
+    } catch {}
+    if (isFixed) {
+      setShowIrregulars(true);
+    }
   };
 
   const openEditPayment = (p: Payment) => {
@@ -446,7 +462,15 @@ export default function DetailPage({ financings, onUpdate }: Props) {
                       {isBalanced && irregularPayments.length > 0 && (
                         <button
                           className="short-pay-delete-all"
-                          onClick={() => setDismissedIrregulars(true)}
+                          onClick={() => {
+                            setDismissedIrregulars(true);
+                            try {
+                              const saved = localStorage.getItem('dismissedAlerts');
+                              const set = saved ? new Set(JSON.parse(saved)) : new Set();
+                              set.add(id);
+                              localStorage.setItem('dismissedAlerts', JSON.stringify([...set]));
+                            } catch {}
+                          }}
                         >
                           Elimina irregolarità
                           <span className="btn-hint">(Consigliato)</span>
@@ -467,6 +491,25 @@ export default function DetailPage({ financings, onUpdate }: Props) {
                     <div className={`short-pay-balance ${isBalanced ? 'balance-zero' : balance > 0 ? 'balance-positive' : 'balance-negative'}`} style={isBalanced && progress >= 100 ? { borderColor: '#00c853', color: '#00c853' } : {}}>
                       <span>{isBalanced ? (progress >= 100 ? 'Concluso' : 'Pareggio di bilancio') : balance > 0 ? 'Credito:' : 'Debito rata:'}</span>
                       {!isBalanced && <span>{balance > 0 ? '+' : '-'}{Math.abs(balance).toFixed(2)} €</span>}
+                    </div>
+                  )}
+                  {!isBalanced && balance < 0 && !dismissedIrregulars && (
+                    <div className="next-rate-hint">
+                      <span>Prossima rata per il pareggio: <strong>{(rateAmount + Math.abs(balance)).toFixed(2)} €</strong></span>
+                      <button
+                        className="next-rate-btn"
+                        onClick={() => {
+                          const suggestedAmount = rateAmount + Math.abs(balance);
+                          const intPart = Math.floor(suggestedAmount).toString();
+                          const decPart = Math.round((suggestedAmount - Math.floor(suggestedAmount)) * 100);
+                          setPaymentInt(intPart);
+                          setPaymentDec(decPart > 0 ? decPart.toString() : '');
+                          setTimeout(() => addPaymentRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+                        }}
+                        title="Imposta rata di pareggio"
+                      >
+                        →
+                      </button>
                     </div>
                   )}
                 </>
@@ -637,9 +680,9 @@ export default function DetailPage({ financings, onUpdate }: Props) {
         </div>
       </div>
 
-      {editingPayment && (
-        <div className="modal-overlay" onClick={() => setEditingPayment(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
+      {editingPayment && createPortal(
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999 }} onClick={() => setEditingPayment(null)}>
+          <div className="modal" style={{ maxWidth: '360px' }} onClick={(e) => e.stopPropagation()}>
             <h2 className="modal-title">Modifica pagamento</h2>
             <p className="modal-field-label">Data</p>
             <input
@@ -693,7 +736,8 @@ export default function DetailPage({ financings, onUpdate }: Props) {
               <button className="btn-primary" onClick={saveEditPayment}>Salva</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {showSwitcher && createPortal(

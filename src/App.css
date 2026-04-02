@@ -599,7 +599,6 @@ select {
 .financing-card {
   cursor: pointer;
   position: relative;
-  min-height: 200px;
   border: none;
 }
 
@@ -1880,10 +1879,11 @@ select {
 }
 
 .date-field input {
-  padding: 0.4rem 0.2rem;
+  padding: 0.65rem 0.4rem;
   border: 2px solid #d4edda;
   border-radius: 0.75rem;
-  font-size: 0.75rem;
+  font-size: 0.85rem;
+  text-align: center;
   color: #2d5a3d;
   background: #f0f9f2;
   outline: none;

@@ -18,7 +18,7 @@ export default function App() {
     saveFinancings(updated);
   };
 
-  const addFinancing = (name: string, emoji: string, totalAmount: number, totalMonths: number, rateType: RateType, rateMode: 'fissa' | 'variabile', startDate: string, endDate: string, initialPaid: number, initialPaidRates: number, fixedRateAmount?: number) => {
+  const addFinancing = (name: string, emoji: string, totalAmount: number, totalMonths: number, rateType: RateType, rateMode: 'fissa' | 'variabile', startDate: string, endDate: string, initialPaid: number, initialPaidRates: number, fixedRateAmount?: number, initialPayments?: import('./types').Payment[]) => {
     let interestPerRate: number | undefined;
     let totalInterest: number | undefined;
     if (rateMode === 'fissa' && fixedRateAmount && fixedRateAmount > 0 && totalMonths > 0) {
@@ -38,7 +38,7 @@ export default function App() {
       endDate,
       initialPaidRates,
       initialPaid,
-      payments: [],
+      payments: initialPayments || [],
       fixedRateAmount,
       interestPerRate,
       totalInterest,

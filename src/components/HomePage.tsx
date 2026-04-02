@@ -1,11 +1,11 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, X } from 'lucide-react';
-import type { Financing, RateType } from '../types';
+import { Plus, Search, X, ChevronDown, ChevronUp } from 'lucide-react';
+import type { Financing, RateType, Payment } from '../types';
 
 interface Props {
   financings: Financing[];
-  onAdd: (name: string, emoji: string, totalAmount: number, totalMonths: number, rateType: RateType, rateMode: 'fissa' | 'variabile', startDate: string, endDate: string, initialPaid: number, initialPaidRates: number, fixedRateAmount?: number) => void;
+  onAdd: (name: string, emoji: string, totalAmount: number, totalMonths: number, rateType: RateType, rateMode: 'fissa' | 'variabile', startDate: string, endDate: string, initialPaid: number, initialPaidRates: number, fixedRateAmount?: number, initialPayments?: Payment[]) => void;
   onDelete: (id: string) => void;
   onUpdate: (updated: Financing) => void;
 }
@@ -68,7 +68,19 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
   const [quickPayOriginal, setQuickPayOriginal] = useState('');
   const [quickPayNote, setQuickPayNote] = useState('');
   const [shortPayDetail, setShortPayDetail] = useState<string | null>(null);
-  const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
+  const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem('dismissedAlerts');
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch { return new Set(); }
+  });
+  const updateDismissedAlerts = (updater: (prev: Set<string>) => Set<string>) => {
+    setDismissedAlerts(prev => {
+      const next = updater(prev);
+      localStorage.setItem('dismissedAlerts', JSON.stringify([...next]));
+      return next;
+    });
+  };
   const [editId, setEditId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editEmoji, setEditEmoji] = useState('');
@@ -103,7 +115,10 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
   const [initialPaidRates, setInitialPaidRates] = useState('0');
   const [paidMode, setPaidMode] = useState<'singola' | 'totale'>('totale');
   const [, /* paidSlideDir */] = useState<'slide-left' | 'slide-right'>('slide-right');
-  const [singleRates, setSingleRates] = useState<{ int: string; dec: string }[]>([]);
+  const [singleRates, setSingleRates] = useState<{ int: string; dec: string; date: string }[]>([]);
+  const [missingDates, setMissingDates] = useState<Set<number>>(new Set());
+  const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
+  const dateRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [initialPaidInt, setInitialPaidInt] = useState('');
   const [initialPaidDec, setInitialPaidDec] = useState('');
 
@@ -171,17 +186,15 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
     if (amount <= 0) return;
     const dur = parseInt(editDuration);
     if (!dur || dur <= 0) return;
-    const editPaidRatesNum = parseInt(editInitialPaidRates) || 0;
-    let initialPaid = 0;
-    if (editPaidRatesNum > 0) {
-      if (editPaidMode === 'totale') {
-        initialPaid = parseFloat(`${editInitialPaidInt || '0'}.${editInitialPaidDec || '0'}`);
-      } else {
-        initialPaid = editSingleRates.reduce((sum, r) => sum + parseFloat(`${r.int || '0'}.${r.dec || '0'}`), 0);
-      }
-      if (initialPaid <= 0) return;
-    }
     const months = editDurationType === 'anni' ? dur * 12 : dur;
+    const fixedRate = editRateMode === 'fissa' ? parseFloat(`${editFixedRateInt || '0'}.${editFixedRateDec || '0'}`) : f.fixedRateAmount;
+    let interestPerRate = f.interestPerRate;
+    let totalInterest = f.totalInterest;
+    if (editRateMode === 'fissa' && fixedRate && fixedRate > 0 && months > 0) {
+      const totalWithInterest = fixedRate * months;
+      totalInterest = totalWithInterest - amount;
+      interestPerRate = totalInterest / months;
+    }
     onUpdate({
       ...f,
       name: editName.trim(),
@@ -190,12 +203,32 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
       totalMonths: months,
       rateType: editRateType,
       rateMode: editRateMode as 'fissa' | 'variabile',
-      initialPaidRates: parseInt(editInitialPaidRates) || 0,
       startDate: editStartDate,
       endDate: editEndDate,
-      initialPaid,
+      fixedRateAmount: fixedRate,
+      interestPerRate,
+      totalInterest,
     });
     setEditId(null);
+  };
+
+  const hasEditChanges = () => {
+    const f = financings.find((x) => x.id === editId);
+    if (!f) return false;
+    const amount = parseFloat(`${editAmountInt || '0'}.${editAmountDec || '0'}`);
+    const dur = parseInt(editDuration) || 0;
+    const months = editDurationType === 'anni' ? dur * 12 : dur;
+    const fixedRate = parseFloat(`${editFixedRateInt || '0'}.${editFixedRateDec || '0'}`);
+    return (
+      editName.trim() !== f.name ||
+      editEmoji !== f.emoji ||
+      Math.abs(amount - f.totalAmount) > 0.001 ||
+      months !== f.totalMonths ||
+      editRateType !== (f.rateType || 'mensile') ||
+      editStartDate !== (f.startDate || '') ||
+      editEndDate !== (f.endDate || '') ||
+      (f.fixedRateAmount ? Math.abs(fixedRate - f.fixedRateAmount) > 0.001 : fixedRate > 0)
+    );
   };
 
   const editAddMonths = (dateStr: string, months: number): string => {
@@ -245,17 +278,20 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
 
   const autoFillRates = (n: number, rateIntVal: string, rateDecVal: string, mode: 'fissa' | 'variabile') => {
     if (mode === 'fissa' && (rateIntVal || rateDecVal)) {
-      const rata = parseFloat(`${rateIntVal || '0'}.${rateDecVal || '0'}`);
-      const total = rata * n;
-      setInitialPaidInt(Math.floor(total).toString());
-      const dec = Math.round((total - Math.floor(total)) * 100);
-      setInitialPaidDec(dec > 0 ? dec.toString() : '');
       return Array(n).fill(null).map(() => ({
         int: rateIntVal || '',
         dec: rateDecVal || '',
+        date: '',
       }));
     }
     return null;
+  };
+
+  const recalcPaidTotal = (rates: { int: string; dec: string; date: string }[]) => {
+    const total = rates.reduce((sum, r) => sum + parseFloat(`${r.int || '0'}.${r.dec || '0'}`), 0);
+    setInitialPaidInt(Math.floor(total).toString());
+    const dec = Math.round((total - Math.floor(total)) * 100);
+    setInitialPaidDec(dec > 0 ? dec.toString() : '');
   };
 
   const updatePaidRatesCount = (val: string) => {
@@ -264,10 +300,12 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
     const filled = rateMode ? autoFillRates(n, fixedRateInt, fixedRateDec, rateMode) : null;
     if (filled) {
       setSingleRates(filled);
+      recalcPaidTotal(filled);
     } else {
       setSingleRates((prev) => {
-        if (n > prev.length) return [...prev, ...Array(n - prev.length).fill({ int: '', dec: '' })];
-        return prev.slice(0, n);
+        const updated = n > prev.length ? [...prev, ...Array(n - prev.length).fill({ int: '', dec: '', date: '' })] : prev.slice(0, n);
+        recalcPaidTotal(updated);
+        return updated;
       });
     }
   };
@@ -449,16 +487,35 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
       missing.push('rateType');
     }
     const paidRates = parseInt(initialPaidRates) || 0;
-    let initialPaid = 0;
+    const initialPayments: Payment[] = [];
+    const missingDateIndices = new Set<number>();
     if (paidRates > 0) {
-      if (paidMode === 'totale') {
-        initialPaid = parseFloat(`${initialPaidInt || '0'}.${initialPaidDec || '0'}`);
-      } else {
-        initialPaid = singleRates.reduce((sum, r) => sum + parseFloat(`${r.int || '0'}.${r.dec || '0'}`), 0);
-      }
-      if (initialPaid <= 0) {
+      let hasInvalidAmount = false;
+      singleRates.forEach((r, i) => {
+        const amt = parseFloat(`${r.int || '0'}.${r.dec || '0'}`);
+        if (amt <= 0) hasInvalidAmount = true;
+        if (!r.date) missingDateIndices.add(i);
+        if (amt > 0 && r.date) {
+          initialPayments.push({ id: crypto.randomUUID(), amount: amt, date: new Date(r.date).toISOString() });
+        }
+      });
+      if (hasInvalidAmount) {
         missing.push('paidAmount');
         if (!firstRef) firstRef = paidAmountRef.current;
+      }
+      if (missingDateIndices.size > 0) {
+        missing.push('paidDates');
+        setMissingDates(missingDateIndices);
+        setTimeout(() => setMissingDates(new Set()), 3000);
+        const firstMissingIdx = Math.min(...missingDateIndices);
+        if (dateRefs.current[firstMissingIdx]) {
+          dateRefs.current[firstMissingIdx]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
+      if (initialPayments.length !== paidRates) {
+        if (!missing.includes('paidAmount') && !missing.includes('paidDates')) {
+          missing.push('paidAmount');
+        }
       }
     }
 
@@ -468,7 +525,7 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
     }
     const months = durationType === 'anni' ? duration * 12 : duration;
     const fixedRate = rateMode === 'fissa' ? parseFloat(`${fixedRateInt || '0'}.${fixedRateDec || '0'}`) : undefined;
-    onAdd(newName.trim(), selectedEmoji, amount, months, rateType as RateType, rateMode as 'fissa' | 'variabile', startDate, endDate, initialPaid, paidRates, fixedRate);
+    onAdd(newName.trim(), selectedEmoji, amount, months, rateType as RateType, rateMode as 'fissa' | 'variabile', startDate, endDate, 0, 0, fixedRate, initialPayments);
     setNewName('');
     setSelectedEmoji('💳');
     setAmountInt('');
@@ -603,7 +660,6 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="search-input"
                   style={{ paddingRight: '2.5rem' }}
-                  autoFocus
                 />
                 <button
                   style={{ position: 'absolute', right: '0.75rem', top: '-6px', bottom: 0, margin: 'auto', height: 'fit-content', background: 'none', border: 'none', cursor: 'pointer', padding: '0.2rem', display: 'flex', alignItems: 'center', opacity: (searchQuery || filterType !== 'tutti' || filterRateMode !== 'tutti') ? 1 : 0, pointerEvents: (searchQuery || filterType !== 'tutti' || filterRateMode !== 'tutti') ? 'auto' : 'none' }}
@@ -731,13 +787,31 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                           setQuickPayNote('');
                         }
                         setQuickPayId(f.id);
+                        setTimeout(() => {
+                          document.getElementById(`quickpay-${f.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }, 100);
                       }}
                       title="Aggiungi rata"
                     >
                       + Rata
                     </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setExpandedCards(prev => {
+                          const n = new Set(prev);
+                          if (n.has(f.id)) n.delete(f.id); else n.add(f.id);
+                          return n;
+                        });
+                      }}
+                      style={{ background: 'white', border: '1.5px solid #333', borderRadius: '0.4rem', cursor: 'pointer', padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '28px', height: '28px', boxSizing: 'border-box', lineHeight: 0 }}
+                      title={expandedCards.has(f.id) ? 'Chiudi' : 'Espandi'}
+                    >
+                      {expandedCards.has(f.id) ? <ChevronUp size={16} color="#333" /> : <ChevronDown size={16} color="#333" />}
+                    </button>
                   </div>
                 </div>
+                {expandedCards.has(f.id) && (<>
                 <hr className="card-separator" />
                 {formatPeriod() && <div className="card-period-center">{formatPeriod()}</div>}
                 <div className="card-info-center" style={{ color: '#333' }}>Rate mancanti: {remainingMonths > 0 ? remainingMonths : 0} su {f.totalMonths}</div>
@@ -826,6 +900,7 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                     </>
                   );
                 })()}
+                </>)}
                 <hr className="card-separator" />
                 <div className={`card-rate-mode ${(f.rateMode || 'variabile') === 'fissa' ? 'mode-fissa' : 'mode-variabile'}`}>
                   Rata {((f.rateMode || 'variabile').charAt(0).toUpperCase() + (f.rateMode || 'variabile').slice(1))}
@@ -920,7 +995,7 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                                     className="short-pay-delete-all"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      setDismissedAlerts(prev => new Set([...prev, f.id]));
+                                      updateDismissedAlerts(prev => new Set([...prev, f.id]));
                                       setShortPayDetail(null);
                                     }}
                                   >
@@ -938,7 +1013,7 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                 })()}
                 {quickPayId === f.id ? (
                   <><hr className="card-separator" />
-                  <div className="quick-pay-section" onClick={(e) => e.stopPropagation()}>
+                  <div id={`quickpay-${f.id}`} className="quick-pay-section" onClick={(e) => e.stopPropagation()}>
                     <div className="quick-pay-row">
                       <button
                         className="card-action-btn card-btn-cancel"
@@ -1106,14 +1181,32 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                     type="number"
                     placeholder="Euro"
                     value={fixedRateInt}
-                    onChange={(e) => setFixedRateInt(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setFixedRateInt(val);
+                      const n = parseInt(initialPaidRates) || 0;
+                      if (n > 0) {
+                        const updated = singleRates.map(r => ({ ...r, int: val, dec: fixedRateDec }));
+                        setSingleRates(updated);
+                        recalcPaidTotal(updated);
+                      }
+                    }}
                   />
                   <span className="amount-sep">,</span>
                   <input
                     type="number"
                     placeholder="Cent"
                     value={fixedRateDec}
-                    onChange={(e) => setFixedRateDec(e.target.value.slice(0, 2))}
+                    onChange={(e) => {
+                      const val = e.target.value.slice(0, 2);
+                      setFixedRateDec(val);
+                      const n = parseInt(initialPaidRates) || 0;
+                      if (n > 0) {
+                        const updated = singleRates.map(r => ({ ...r, int: fixedRateInt, dec: val }));
+                        setSingleRates(updated);
+                        recalcPaidTotal(updated);
+                      }
+                    }}
                     className="amount-dec"
                   />
                   <span className="amount-currency">€</span>
@@ -1126,19 +1219,35 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                 <div className="date-row">
                   <div className="date-field">
                     <label>Inizio</label>
-                    <input
-                      type="date"
-                      value={startDate}
-                      onChange={(e) => handleStartDateChange(e.target.value)}
-                    />
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => handleStartDateChange(e.target.value)}
+                        onInput={(e) => { const val = (e.target as HTMLInputElement).value; if (val !== startDate) handleStartDateChange(val); }}
+                        style={!startDate ? { color: 'transparent' } : {}}
+                      />
+                      {startDate && (
+                        <button type="button" onClick={() => handleStartDateChange('')} style={{ position: 'absolute', right: '0.4rem', top: '50%', transform: 'translateY(-50%)', background: '#c0392b', border: 'none', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 }}><X size={10} color="white" /></button>
+                      )}
+                      {!startDate && <span style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999', fontSize: '0.9rem', pointerEvents: 'none' }}>Data</span>}
+                    </div>
                   </div>
                   <div className="date-field">
                     <label>Fine</label>
-                    <input
-                      type="date"
-                      value={endDate}
-                      onChange={(e) => handleEndDateChange(e.target.value)}
-                    />
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => handleEndDateChange(e.target.value)}
+                        onInput={(e) => { const val = (e.target as HTMLInputElement).value; if (val !== endDate) handleEndDateChange(val); }}
+                        style={!endDate ? { color: 'transparent' } : {}}
+                      />
+                      {endDate && (
+                        <button type="button" onClick={() => handleEndDateChange('')} style={{ position: 'absolute', right: '0.4rem', top: '50%', transform: 'translateY(-50%)', background: '#c0392b', border: 'none', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 }}><X size={10} color="white" /></button>
+                      )}
+                      {!endDate && <span style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999', fontSize: '0.9rem', pointerEvents: 'none' }}>Data</span>}
+                    </div>
                   </div>
                 </div>
               </>
@@ -1159,78 +1268,87 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
             </div>
             {(parseInt(initialPaidRates) || 0) > 0 && (
               <>
-                <p className={`modal-field-label ${errors.has('paidAmount') ? 'label-error' : ''}`}>Importo rate pagate <span className="required-tag">*</span></p>
-                <div className={`paid-mode-toggle ${errors.has('paidAmount') ? 'input-error-row' : ''}`}>
-                  <div className={`paid-mode-slider ${paidMode === 'totale' ? 'right' : 'left'}`} />
-                  <button
-                    className={`paid-mode-btn ${paidMode === 'singola' ? 'active' : ''}`}
-                    onClick={() => setPaidMode('singola')}
-                  >
-                    Singola
-                  </button>
-                  <button
-                    className={`paid-mode-btn ${paidMode === 'totale' ? 'active' : ''}`}
-                    onClick={() => setPaidMode('totale')}
-                  >
-                    Totale
-                  </button>
-                </div>
-                <div className="paid-carousel">
-                  <div className={`paid-carousel-track ${paidMode === 'singola' ? 'show-left' : 'show-right'}`}>
-                    <div className="paid-carousel-panel">
-                      <div className="single-rates-list">
-                        {singleRates.map((r, i) => (
-                          <div key={i} className="single-rate-card">
-                            <span className="single-rate-label">Rata {i + 1}</span>
-                            <div className="amount-row">
-                              <input
-                                type="number"
-                                placeholder="Euro"
-                                value={r.int}
-                                onChange={(e) => {
-                                  const arr = [...singleRates];
-                                  arr[i] = { ...arr[i], int: e.target.value };
-                                  setSingleRates(arr);
-                                }}
-                              />
-                              <span className="amount-sep">,</span>
-                              <input
-                                type="number"
-                                placeholder="Cent"
-                                value={r.dec}
-                                onChange={(e) => {
-                                  const arr = [...singleRates];
-                                  arr[i] = { ...arr[i], dec: e.target.value.slice(0, 2) };
-                                  setSingleRates(arr);
-                                }}
-                                className="amount-dec"
-                              />
-                              <span className="amount-currency">€</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="paid-carousel-panel">
+                <p className={`modal-field-label ${errors.has('paidAmount') ? 'label-error' : ''}`}>Rate pagate <span className="required-tag">*</span></p>
+                <div className="single-rates-list">
+                  {singleRates.map((r, i) => (
+                    <div key={i} className="single-rate-card">
+                      <span className="single-rate-label">Rata {i + 1}</span>
                       <div className="amount-row">
                         <input
                           type="number"
                           placeholder="Euro"
-                          value={initialPaidInt}
-                          onChange={(e) => setInitialPaidInt(e.target.value)}
+                          value={r.int}
+                          onChange={(e) => {
+                            const arr = [...singleRates];
+                            arr[i] = { ...arr[i], int: e.target.value };
+                            setSingleRates(arr);
+                            recalcPaidTotal(arr);
+                          }}
+                          {...(rateMode === 'fissa' ? { disabled: true, style: { opacity: 0.6 } } : {})}
                         />
                         <span className="amount-sep">,</span>
                         <input
                           type="number"
                           placeholder="Cent"
-                          value={initialPaidDec}
-                          onChange={(e) => setInitialPaidDec(e.target.value.slice(0, 2))}
+                          value={r.dec}
+                          onChange={(e) => {
+                            const arr = [...singleRates];
+                            arr[i] = { ...arr[i], dec: e.target.value.slice(0, 2) };
+                            setSingleRates(arr);
+                            recalcPaidTotal(arr);
+                          }}
                           className="amount-dec"
+                          {...(rateMode === 'fissa' ? { disabled: true, style: { opacity: 0.6 } } : {})}
                         />
                         <span className="amount-currency">€</span>
                       </div>
+                      <div style={{ position: 'relative', marginTop: '0.4rem' }} ref={el => { dateRefs.current[i] = el; }}>
+                        <input
+                          type="date"
+                          value={r.date}
+                          onChange={(e) => {
+                            const arr = [...singleRates];
+                            arr[i] = { ...arr[i], date: e.target.value };
+                            setSingleRates(arr);
+                            setMissingDates(prev => { const n = new Set(prev); n.delete(i); return n; });
+                          }}
+                          onInput={(e) => {
+                            const val = (e.target as HTMLInputElement).value;
+                            if (val !== r.date) {
+                              const arr = [...singleRates];
+                              arr[i] = { ...arr[i], date: val };
+                              setSingleRates(arr);
+                            }
+                          }}
+                          style={{ width: '100%', padding: '0.75rem 2.5rem 0.75rem 0.6rem', border: `2px solid ${missingDates.has(i) ? '#c0392b' : '#d4edda'}`, borderRadius: '0.75rem', fontSize: '1rem', color: r.date ? '#2d5a3d' : 'transparent', background: missingDates.has(i) ? '#fde8e8' : '#f0f9f2', textAlign: 'center', boxSizing: 'border-box', transition: 'border-color 0.3s, background 0.3s' }}
+                        />
+                        {r.date && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const arr = [...singleRates];
+                              arr[i] = { ...arr[i], date: '' };
+                              setSingleRates(arr);
+                            }}
+                            style={{ position: 'absolute', right: '0.5rem', top: '50%', transform: 'translateY(-50%)', background: '#c0392b', border: 'none', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 }}
+                          >
+                            <X size={12} color="white" />
+                          </button>
+                        )}
+                        {!r.date && (
+                          <span style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#c0392b', fontSize: '0.85rem', pointerEvents: 'none' }}>Aggiungere Data</span>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  ))}
+                </div>
+                <p className="modal-field-label">Totale pagato</p>
+                <div className="amount-row" style={{ opacity: 0.5, pointerEvents: 'none' }}>
+                  <input type="number" placeholder="Euro" value={initialPaidInt} disabled />
+                  <span className="amount-sep">,</span>
+                  <input type="number" placeholder="Cent" value={initialPaidDec} disabled className="amount-dec" />
+                  <span className="amount-currency">€</span>
                 </div>
               </>
             )}
@@ -1358,35 +1476,14 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                     type="number"
                     placeholder="Euro"
                     value={editFixedRateInt}
-                    onChange={(e) => {
-                      setEditFixedRateInt(e.target.value);
-                      const rata = parseFloat(`${e.target.value || '0'}.${editFixedRateDec || '0'}`);
-                      const dur = parseInt(editDuration) || 0;
-                      if (rata > 0 && dur > 0) {
-                        const tot = rata * dur;
-                        setEditAmountInt(Math.floor(tot).toString());
-                        const dec = Math.round((tot - Math.floor(tot)) * 100);
-                        setEditAmountDec(dec > 0 ? dec.toString() : '');
-                      }
-                    }}
+                    onChange={(e) => setEditFixedRateInt(e.target.value)}
                   />
                   <span className="amount-sep">,</span>
                   <input
                     type="number"
                     placeholder="Cent"
                     value={editFixedRateDec}
-                    onChange={(e) => {
-                      const val = e.target.value.slice(0, 2);
-                      setEditFixedRateDec(val);
-                      const rata = parseFloat(`${editFixedRateInt || '0'}.${val || '0'}`);
-                      const dur = parseInt(editDuration) || 0;
-                      if (rata > 0 && dur > 0) {
-                        const tot = rata * dur;
-                        setEditAmountInt(Math.floor(tot).toString());
-                        const dec = Math.round((tot - Math.floor(tot)) * 100);
-                        setEditAmountDec(dec > 0 ? dec.toString() : '');
-                      }
-                    }}
+                    onChange={(e) => setEditFixedRateDec(e.target.value.slice(0, 2))}
                     className="amount-dec"
                   />
                   <span className="amount-currency">€</span>
@@ -1399,19 +1496,35 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                 <div className="date-row">
                   <div className="date-field">
                     <label>Inizio</label>
-                    <input
-                      type="date"
-                      value={editStartDate}
-                      onChange={(e) => handleEditStartDate(e.target.value)}
-                    />
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type="date"
+                        value={editStartDate}
+                        onChange={(e) => handleEditStartDate(e.target.value)}
+                        onInput={(e) => { const val = (e.target as HTMLInputElement).value; if (val !== editStartDate) handleEditStartDate(val); }}
+                        style={!editStartDate ? { color: 'transparent' } : {}}
+                      />
+                      {editStartDate && (
+                        <button type="button" onClick={() => handleEditStartDate('')} style={{ position: 'absolute', right: '0.4rem', top: '50%', transform: 'translateY(-50%)', background: '#c0392b', border: 'none', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 }}><X size={10} color="white" /></button>
+                      )}
+                      {!editStartDate && <span style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999', fontSize: '0.9rem', pointerEvents: 'none' }}>Data</span>}
+                    </div>
                   </div>
                   <div className="date-field">
                     <label>Fine</label>
-                    <input
-                      type="date"
-                      value={editEndDate}
-                      onChange={(e) => handleEditEndDate(e.target.value)}
-                    />
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type="date"
+                        value={editEndDate}
+                        onChange={(e) => handleEditEndDate(e.target.value)}
+                        onInput={(e) => { const val = (e.target as HTMLInputElement).value; if (val !== editEndDate) handleEditEndDate(val); }}
+                        style={!editEndDate ? { color: 'transparent' } : {}}
+                      />
+                      {editEndDate && (
+                        <button type="button" onClick={() => handleEditEndDate('')} style={{ position: 'absolute', right: '0.4rem', top: '50%', transform: 'translateY(-50%)', background: '#c0392b', border: 'none', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 }}><X size={10} color="white" /></button>
+                      )}
+                      {!editEndDate && <span style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999', fontSize: '0.9rem', pointerEvents: 'none' }}>Data</span>}
+                    </div>
                   </div>
                 </div>
               </>
@@ -1521,7 +1634,7 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
               <button className="btn-secondary" onClick={() => setEditId(null)}>
                 Annulla
               </button>
-              <button className="btn-primary" onClick={handleSaveEdit}>
+              <button className="btn-primary" onClick={handleSaveEdit} disabled={!hasEditChanges()} style={!hasEditChanges() ? { opacity: 0.4, pointerEvents: 'none' } : {}}>
                 Salva
               </button>
             </div>
