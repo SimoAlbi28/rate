@@ -113,7 +113,6 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
   const [fixedRateInt, setFixedRateInt] = useState('');
   const [fixedRateDec, setFixedRateDec] = useState('');
   const [initialPaidRates, setInitialPaidRates] = useState('0');
-  const [paidMode, setPaidMode] = useState<'singola' | 'totale'>('totale');
   const [, /* paidSlideDir */] = useState<'slide-left' | 'slide-right'>('slide-right');
   const [singleRates, setSingleRates] = useState<{ int: string; dec: string; date: string }[]>([]);
   const [missingDates, setMissingDates] = useState<Set<number>>(new Set());
@@ -268,13 +267,6 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
     else if (editEndDate && m > 0) setEditStartDate(editSubMonths(editEndDate, m));
   };
 
-  const handleEditDurationType = (val: 'mesi' | 'anni') => {
-    setEditDurationType(val);
-    const d = parseInt(editDuration) || 0;
-    const m = val === 'anni' ? d * 12 : d;
-    if (editStartDate && m > 0) setEditEndDate(editAddMonths(editStartDate, m));
-    else if (editEndDate && m > 0) setEditStartDate(editSubMonths(editEndDate, m));
-  };
 
   const autoFillRates = (n: number, rateIntVal: string, rateDecVal: string, mode: 'fissa' | 'variabile') => {
     if (mode === 'fissa' && (rateIntVal || rateDecVal)) {
@@ -310,26 +302,6 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
     }
   };
 
-  const updateEditPaidRatesCount = (val: string) => {
-    setEditInitialPaidRates(val);
-    const n = parseInt(val) || 0;
-    if (editRateMode === 'fissa' && (editFixedRateInt || editFixedRateDec)) {
-      const rata = parseFloat(`${editFixedRateInt || '0'}.${editFixedRateDec || '0'}`);
-      const total = rata * n;
-      setEditInitialPaidInt(Math.floor(total).toString());
-      const dec = Math.round((total - Math.floor(total)) * 100);
-      setEditInitialPaidDec(dec > 0 ? dec.toString() : '');
-      setEditSingleRates(Array(n).fill(null).map(() => ({
-        int: editFixedRateInt || '',
-        dec: editFixedRateDec || '',
-      })));
-    } else {
-      setEditSingleRates((prev) => {
-        if (n > prev.length) return [...prev, ...Array(n - prev.length).fill({ int: '', dec: '' })];
-        return prev.slice(0, n);
-      });
-    }
-  };
 
   const getBalance = (f: Financing) => {
     const ra = f.fixedRateAmount || (f.totalMonths > 0 ? f.totalAmount / f.totalMonths : 0);
@@ -537,7 +509,6 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
     setFixedRateInt('');
     setFixedRateDec('');
     setInitialPaidRates('0');
-    setPaidMode('totale');
     setSingleRates([]);
     setStartDate('');
     setEndDate('');
