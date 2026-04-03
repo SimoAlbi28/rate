@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Search, X } from 'lucide-react';
+import { AppsListDetail24Regular } from '@fluentui/react-icons';
 import type { Financing, RateType, Payment } from '../types';
 
 interface Props {
@@ -700,6 +701,22 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
             const ratesPaid = (rateAmount > 0 ? Math.floor(paid / rateAmount) : 0) + (f.initialPaidRates || 0);
             const remainingMonths = f.totalMonths - ratesPaid;
 
+            const isFixedMode = (f.rateMode || 'variabile') === 'fissa' && rateAmount > 0;
+            const maxRatesHP = f.totalMonths - (f.initialPaidRates || 0);
+            const effectiveRatesHP = (() => {
+              if (!isFixedMode || rateAmount <= 0) return f.payments.length;
+              let cum = 0;
+              for (const p of f.payments) {
+                const ratio = p.amount / rateAmount;
+                const rounded = Math.round(ratio);
+                const isMult = rounded >= 1 && Math.abs(p.amount - rounded * rateAmount) < 0.01;
+                if (isMult) { cum += Math.min(rounded, Math.max(maxRatesHP - cum, 0)); } else { cum += 1; }
+              }
+              return cum;
+            })();
+            const totalRatesHP = effectiveRatesHP + (f.initialPaidRates || 0);
+            const maxReachedHP = f.totalMonths > 0 && totalRatesHP >= f.totalMonths;
+
             const residuo = f.totalAmount - paid;
             const formatPeriod = () => {
               if (f.startDate && f.endDate) {
@@ -714,7 +731,13 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
               <div
                 key={f.id}
                 className="card financing-card"
-                onClick={() => navigate(`/detail/${f.id}`)}
+                onClick={() => {
+                  setExpandedCards(prev => {
+                    const n = new Set(prev);
+                    if (n.has(f.id)) n.delete(f.id); else n.add(f.id);
+                    return n;
+                  });
+                }}
               >
                 <div className="card-top-row">
                   <div className="card-emoji">{f.emoji}</div>
@@ -742,6 +765,8 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                     </button>
                     <button
                       className="card-action-btn card-btn-add"
+                      disabled={maxReachedHP}
+                      style={maxReachedHP ? { opacity: 0.4, pointerEvents: 'none' } : {}}
                       onClick={(e) => {
                         e.stopPropagation();
                         if ((f.rateMode || 'variabile') === 'fissa' && rateAmount > 0) {
@@ -764,21 +789,19 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                       }}
                       title="Aggiungi rata"
                     >
-                      + Rata
+                      <Plus size={10} strokeWidth={3} /><span style={{ position: 'relative', top: '-0.5px' }}>Rata</span>
                     </button>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        setExpandedCards(prev => {
-                          const n = new Set(prev);
-                          if (n.has(f.id)) n.delete(f.id); else n.add(f.id);
-                          return n;
-                        });
+                        navigate(`/detail/${f.id}`);
                       }}
-                      style={{ background: 'white', border: '1.5px solid #333', borderRadius: '0.4rem', cursor: 'pointer', padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '28px', height: '28px', boxSizing: 'border-box', lineHeight: 0 }}
-                      title={expandedCards.has(f.id) ? 'Chiudi' : 'Espandi'}
+                      className="riepilogo-icon-box"
+                      style={{ background: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '26px', height: '26px', boxSizing: 'border-box', lineHeight: 0, position: 'relative' }}
+                      title="Apri dettaglio"
                     >
-                      {expandedCards.has(f.id) ? <ChevronUp size={16} color="#333" /> : <ChevronDown size={16} color="#333" />}
+                      <AppsListDetail24Regular style={{ fontSize: 15, color: '#2ecc71', position: 'absolute', clipPath: 'inset(0 0 50% 0)' }} />
+                      <AppsListDetail24Regular style={{ fontSize: 15, color: '#e74c3c', position: 'absolute', clipPath: 'inset(50% 0 0 0)' }} />
                     </button>
                   </div>
                 </div>
@@ -872,6 +895,31 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                   );
                 })()}
                 </>)}
+                {!expandedCards.has(f.id) && (() => {
+                  const totalRatesPaidProg = f.payments.length + (f.initialPaidRates || 0);
+                  const interestPaidProg = f.interestPerRate ? f.interestPerRate * totalRatesPaidProg : 0;
+                  const capitalPaidProg = paid - interestPaidProg;
+                  const progressCapital = f.totalAmount > 0 ? (Math.max(capitalPaidProg, 0) / f.totalAmount) * 100 : 0;
+                  const totalRates = f.totalMonths || 0;
+                  return (
+                    <>
+                      <hr className="card-separator" />
+                      <div className="progress-bar progress-bar-ticks">
+                        <div
+                          className="progress-fill"
+                          style={{ width: `${Math.min(progressCapital, 100)}%`, background: getProgressColor(progressCapital) }}
+                        />
+                        {totalRates > 1 && Array.from({ length: totalRates - 1 }, (_, i) => (
+                          <div
+                            key={i}
+                            className="progress-tick"
+                            style={{ left: `${((i + 1) / totalRates) * 100}%` }}
+                          />
+                        ))}
+                      </div>
+                    </>
+                  );
+                })()}
                 <hr className="card-separator" />
                 <div className={`card-rate-mode ${(f.rateMode || 'variabile') === 'fissa' ? 'mode-fissa' : 'mode-variabile'}`}>
                   Rata {((f.rateMode || 'variabile').charAt(0).toUpperCase() + (f.rateMode || 'variabile').slice(1))}

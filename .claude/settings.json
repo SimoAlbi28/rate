@@ -13,7 +13,10 @@
       "Bash(convert rate-logo.png -resize 512x512 rate-icon512.png)",
       "Bash(convert rate-logo.png -resize 192x192 rate-icon192.png)",
       "Bash(npm install:*)",
-      "Bash(pnpm remove:*)"
+      "Bash(pnpm remove:*)",
+      "Bash(node -e \"const icons = require\\('@fluentui/react-icons'\\); const eyeIcons = Object.keys\\(icons\\).filter\\(k => k.toLowerCase\\(\\).includes\\('eye'\\) && k.endsWith\\('Regular'\\)\\); console.log\\(eyeIcons.join\\('\\\\n'\\)\\)\")",
+      "Bash(node -e \"const icons = require\\('@fluentui/react-icons'\\); const names = Object.keys\\(icons\\).filter\\(k => k.endsWith\\('Regular'\\) && \\(k.toLowerCase\\(\\).includes\\('info'\\) || k.toLowerCase\\(\\).includes\\('detail'\\) || k.toLowerCase\\(\\).includes\\('list'\\) || k.toLowerCase\\(\\).includes\\('document'\\) || k.toLowerCase\\(\\).includes\\('clipboard'\\) || k.toLowerCase\\(\\).includes\\('data'\\)\\)\\); console.log\\(names.filter\\(n => n.includes\\('24'\\)\\).join\\('\\\\n'\\)\\)\")",
+      "Bash(node -e \"const XLSX = require\\('/root/simoproject/rate/node_modules/xlsx'\\); const wb = XLSX.utils.book_new\\(\\); const data = [['A','B'],['hello','world']]; const ws = XLSX.utils.aoa_to_sheet\\(data\\); console.log\\(JSON.stringify\\(ws\\)\\);\")"
     ]
   }
 }

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useNavigate, useParams } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { Home } from 'lucide-react';
+import { AppsListDetail24Regular } from '@fluentui/react-icons';
 import type { Financing, Payment } from '../types';
 
 const PROFILE_ICONS = [
@@ -96,16 +97,59 @@ export default function DetailPage({ financings, onUpdate }: Props) {
     return '#2ecc71';
   };
 
+  const fmtEuro = (v: number) => v <= 0.004 ? '-' : `${v.toFixed(2)} €`;
+
   const paymentsPaid = financing.payments.reduce((s, p) => s + p.amount, 0);
   const paid = paymentsPaid + (financing.initialPaid || 0);
   const rateAmount = financing.fixedRateAmount || (financing.totalMonths > 0 ? financing.totalAmount / financing.totalMonths : 0);
+  const isFixed = (financing.rateMode || 'variabile') === 'fissa' && rateAmount > 0;
+
+  // Conta quante rate vale un singolo pagamento (senza cap)
+  const countEffectiveRates = (p: Payment) => {
+    if (!isFixed || rateAmount <= 0) return 1;
+    const ratio = p.amount / rateAmount;
+    const rounded = Math.round(ratio);
+    if (rounded >= 1 && Math.abs(p.amount - rounded * rateAmount) < 0.01) return rounded;
+    return 1;
+  };
+
+  // Conta rate effettive con cap: un multiplo della rata fissa vale N rate, ma non supera il totale rate
+  const maxRatesFromPayments = financing.totalMonths - (financing.initialPaidRates || 0);
+  const { effectiveRates: effectiveRatesFromPayments, excessCredit, cappedPayments } = (() => {
+    if (!isFixed || rateAmount <= 0) return { effectiveRates: financing.payments.length, excessCredit: 0, cappedPayments: [] as { payment: Payment, ratesUsed: number, accDebt: number }[] };
+    let cumulative = 0;
+    let credit = 0;
+    let runningDebt = 0; // debito accumulato da pagamenti irregolari
+    const capped: { payment: Payment, ratesUsed: number, accDebt: number }[] = [];
+    for (const p of financing.payments) {
+      const ratio = p.amount / rateAmount;
+      const rounded = Math.round(ratio);
+      const isMultiple = rounded >= 1 && Math.abs(p.amount - rounded * rateAmount) < 0.01;
+      if (isMultiple) {
+        const canAdd = Math.max(maxRatesFromPayments - cumulative, 0);
+        const actual = Math.min(rounded, canAdd);
+        cumulative += actual;
+        if (rounded > actual) {
+          credit += (rounded - actual) * rateAmount;
+          capped.push({ payment: p, ratesUsed: actual, accDebt: runningDebt });
+        }
+      } else {
+        cumulative += 1;
+        const diff = rateAmount - p.amount;
+        if (diff > 0.01) runningDebt += diff;
+      }
+    }
+    return { effectiveRates: cumulative, excessCredit: credit, cappedPayments: capped };
+  })();
+  const totalPaymentsCount = effectiveRatesFromPayments + (financing.initialPaidRates || 0);
+  const maxReached = financing.totalMonths > 0 && totalPaymentsCount >= financing.totalMonths;
+
   const ratesPaid = (rateAmount > 0 ? Math.floor(paid / rateAmount) : 0) + (financing.initialPaidRates || 0);
   const remainingMonths = financing.totalMonths - ratesPaid;
-  const progressInterestPaid = financing.interestPerRate ? financing.interestPerRate * (financing.payments.length + (financing.initialPaidRates || 0)) : 0;
+  const progressInterestPaid = financing.interestPerRate ? financing.interestPerRate * totalPaymentsCount : 0;
   const progressCapitalOnly = Math.max(paid - progressInterestPaid, 0);
   const progress = financing.totalAmount > 0 ? (progressCapitalOnly / financing.totalAmount) * 100 : 0;
 
-  const isFixed = (financing.rateMode || 'variabile') === 'fissa' && rateAmount > 0;
   const fixedInt = isFixed ? Math.floor(rateAmount).toString() : '';
   const fixedDec = isFixed ? (Math.round((rateAmount - Math.floor(rateAmount)) * 100) || 0).toString() : '';
   const fixedOriginal = isFixed ? `${fixedInt}.${fixedDec}` : '';
@@ -120,7 +164,26 @@ export default function DetailPage({ financings, onUpdate }: Props) {
   const currentRate = `${paymentInt || '0'}.${paymentDec || '0'}`;
   const isModified = isFixed && originalRate !== '' && currentRate !== originalRate;
 
+  // Un pagamento è irregolare solo se NON è un multiplo della rata fissa
+  const isIrregularPayment = (p: Payment) => {
+    if (!isFixed || rateAmount <= 0) return true;
+    const ratio = p.amount / rateAmount;
+    const rounded = Math.round(ratio);
+    return !(rounded >= 1 && Math.abs(p.amount - rounded * rateAmount) < 0.01);
+  };
+
+  // Credito: eccedenza da pagamenti multipli che superano il cap + eventuale eccedenza rispetto al totale con interessi
+  const totalePagatoAll = financing.payments.reduce((s, p) => s + p.amount, 0);
+  const hasCredit = isFixed && excessCredit > 0.01;
+  const overpaidAmount = excessCredit;
+
+  // Debito: pagato meno del dovuto in base alle rate effettive (cappate)
+  const totaleDovutoAll = rateAmount > 0 ? rateAmount * effectiveRatesFromPayments : 0;
+  const debtAmount = totalePagatoAll - excessCredit - totaleDovutoAll;
+  const hasDebt = isFixed && debtAmount < -0.01;
+
   const addPayment = () => {
+    if (maxReached) return;
     const val = parseFloat(`${paymentInt || '0'}.${paymentDec || '0'}`);
     if (isNaN(val) || val <= 0) return;
     const payment: Payment = {
@@ -268,39 +331,43 @@ export default function DetailPage({ financings, onUpdate }: Props) {
       <div className="content">
         {/* RIEPILOGO */}
         <div className="card section-card" style={{ position: 'relative' }}>
-          <button onClick={() => navigate('/')} style={{ position: 'absolute', right: '1rem', top: '0.75rem', background: 'white', border: '1.5px solid #333', borderRadius: '0.5rem', cursor: 'pointer', padding: '0.5rem', display: 'flex', alignItems: 'center', zIndex: 1 }} title="Torna alla Home"><Home size={24} color="#333" /></button>
-          <h3 className="section-heading" style={{ textAlign: 'left', fontSize: '1.15rem', marginTop: '0.5rem' }}>📊 RIEPILOGO</h3>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0', marginBottom: '0.5rem' }}>
+            <span className="riepilogo-icon-box" onClick={() => navigate('/')} style={{ position: 'relative', width: 36, height: 36, display: 'inline-flex', flexShrink: 0, borderRadius: '0.45rem', cursor: 'pointer' }}>
+              <AppsListDetail24Regular style={{ fontSize: 20, color: '#2ecc71', position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', clipPath: 'inset(0 0 50% 0)' }} />
+              <AppsListDetail24Regular style={{ fontSize: 20, color: '#e74c3c', position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', clipPath: 'inset(50% 0 0 0)' }} />
+            </span>
+            <h3 className="section-heading riepilogo-title" style={{ textAlign: 'center', fontSize: '1.15rem', margin: 0, flex: 1 }}>RIEPILOGO</h3>
+            <button onClick={() => navigate('/')} style={{ background: 'white', border: '1.5px solid #333', borderRadius: '0.5rem', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 39, height: 39, flexShrink: 0, boxSizing: 'border-box' }} title="Torna alla Home"><Home size={24} color="#333" /></button>
+          </div>
           <div className="summary-grid">
             <div className="summary-column">
               {(financing.rateMode || 'variabile') === 'fissa' && (() => {
-                const totalPaidRates = financing.payments.reduce((sum, p) => sum + p.amount, 0);
-                const expectedTotal = financing.payments.length * rateAmount;
-                const balance = financing.payments.length === 0 ? 0 : totalPaidRates - expectedTotal;
-                const isComplete = progress >= 100;
-                const label = isComplete ? 'Concluso' : Math.abs(balance) < 0.01 ? 'Pareggio di bilancio' : balance > 0 ? 'Credito' : 'Debito';
-                const color = isComplete ? '#00c853' : Math.abs(balance) < 0.01 ? '#1a7a42' : balance > 0 ? '#1a5276' : '#7b241c';
+                const netBal = debtAmount + excessCredit;
+                const isComplete = maxReached && netBal >= -0.01;
+                const label = isComplete ? (netBal > 0.01 ? 'Concluso' : 'Concluso') : Math.abs(netBal) < 0.01 ? 'Pareggio di bilancio' : netBal > 0 ? 'Credito' : 'Debito';
+                const color = isComplete ? '#00c853' : Math.abs(netBal) < 0.01 ? '#1a7a42' : netBal > 0 ? '#1a5276' : '#7b241c';
                 return (
-                  <div className="summary-box" style={{ borderColor: color }}>
+                  <div className="summary-box" style={{ borderColor: color, color }}>
                     <span className="summary-label">SITUAZIONE</span>
                     <span className="summary-value" style={{ color }}>{label}</span>
-                    {Math.abs(balance) >= 0.01 && (
-                      <span className="summary-value" style={{ color }}>{balance > 0 ? '+' : '-'}{Math.abs(balance).toFixed(2)} €</span>
+                    {Math.abs(netBal) >= 0.01 && (
+                      <span className="summary-value" style={{ color, fontSize: '0.65rem', fontWeight: 'normal' }}>({netBal > 0 ? 'Credito' : 'Debito'}: {netBal > 0 ? '+' : '-'}{Math.abs(netBal).toFixed(2)} €)</span>
                     )}
                   </div>
                 );
               })()}
-              <div className="summary-box" style={{ borderColor: '#333' }}>
+              <div className="summary-box" style={{ borderColor: '#333', color: '#333' }}>
                 <span className="summary-label">RATE RIMANENTI</span>
                 <span className="summary-value" style={{ color: '#333' }}>{Math.max(remainingMonths, 0)}</span>
               </div>
               {financing.interestPerRate != null && financing.interestPerRate > 0 && (
-                <div className="summary-box" style={{ borderColor: '#1a5276' }}>
-                  <span className="summary-label" style={{ color: '#1a5276' }}>INTERESSI X RATA</span>
+                <div className="summary-box" style={{ borderColor: '#1a5276', color: '#1a5276' }}>
+                  <span className="summary-label">INTERESSI X RATA</span>
                   <span className="summary-value" style={{ color: '#1a5276' }}>{financing.interestPerRate.toFixed(2)} €</span>
                 </div>
               )}
-              <div className="summary-box" style={{ borderColor: '#c0392b' }}>
-                <span className="summary-label">TOTALE DA PAGARE (SENZA INTERESSI)</span>
+              <div className="summary-box" style={{ borderColor: '#c0392b', color: '#c0392b' }}>
+                <span className="summary-label">TOTALE DA PAGARE <br /><span style={{ color: '#3498db' }}>(SENZA INTERESSI)</span></span>
                 <span className="summary-value" style={{ color: '#c0392b' }}>{financing.totalAmount.toFixed(2)} €</span>
               </div>
               {(() => {
@@ -309,13 +376,13 @@ export default function DetailPage({ financings, onUpdate }: Props) {
                 const capitalPaid = paid - interestPaid;
                 return (
                   <>
-                    <div className="summary-box" style={{ borderColor: '#27ae60' }}>
-                      <span className="summary-label">PAGATO (NO INTERESSI)</span>
-                      <span className="summary-value" style={{ color: '#27ae60' }}>{(capitalPaid > 0 ? capitalPaid : 0).toFixed(2)} €</span>
+                    <div className="summary-box" style={{ borderColor: '#27ae60', color: '#27ae60' }}>
+                      <span className="summary-label">PAGATO <br /><span style={{ color: '#3498db' }}>(SENZA INTERESSI)</span></span>
+                      <span className="summary-value" style={{ color: '#27ae60' }}>{fmtEuro(capitalPaid > 0 ? capitalPaid : 0)}</span>
                     </div>
-                    <div className="summary-box" style={{ borderColor: '#d4a017' }}>
-                      <span className="summary-label">RESTANTE SENZA INTERESSI</span>
-                      <span className="summary-value" style={{ color: '#d4a017' }}>{Math.max(financing.totalAmount - (capitalPaid > 0 ? capitalPaid : 0), 0).toFixed(2)} €</span>
+                    <div className="summary-box" style={{ borderColor: '#d4a017', color: '#d4a017' }}>
+                      <span className="summary-label">RESTANTE <br /><span style={{ color: '#3498db' }}>(SENZA INTERESSI)</span></span>
+                      <span className="summary-value" style={{ color: '#d4a017' }}>{fmtEuro(Math.max(financing.totalAmount - (capitalPaid > 0 ? capitalPaid : 0), 0))}</span>
                     </div>
                   </>
                 );
@@ -323,12 +390,12 @@ export default function DetailPage({ financings, onUpdate }: Props) {
             </div>
             <div className="summary-column">
               {(financing.rateMode || 'variabile') === 'fissa' && rateAmount > 0 && (
-                <div className="summary-box" style={{ borderColor: '#8e44ad' }}>
+                <div className="summary-box" style={{ borderColor: '#8e44ad', color: '#8e44ad' }}>
                   <span className="summary-label">RATA FISSA</span>
                   <span className="summary-value" style={{ color: '#8e44ad' }}>{rateAmount.toFixed(2)} €</span>
                 </div>
               )}
-              <div className="summary-box" style={{ borderColor: '#666' }}>
+              <div className="summary-box" style={{ borderColor: '#666', color: '#666' }}>
                 <span className="summary-label">RATE PAGATE</span>
                 <span className="summary-value" style={{ color: '#666' }}>{ratesPaid}</span>
                 <span className="summary-sub">su {financing.totalMonths} rate totali</span>
@@ -338,26 +405,26 @@ export default function DetailPage({ financings, onUpdate }: Props) {
                 if (!interestPerRate || interestPerRate < 0.01) return null;
                 return (
                   <>
-                    <div className="summary-box" style={{ borderColor: '#3498db' }}>
+                    <div className="summary-box" style={{ borderColor: '#3498db', color: '#3498db' }}>
                       <span className="summary-label">INTERESSI PAGATI</span>
                       <span className="summary-value" style={{ color: '#3498db' }}>{(interestPerRate * (financing.payments.length + (financing.initialPaidRates || 0))).toFixed(2)} €</span>
                     </div>
-                    <div className="summary-box" style={{ borderColor: '#e74c3c' }}>
-                      <span className="summary-label">TOTALE DA PAGARE CON INTERESSI</span>
+                    <div className="summary-box" style={{ borderColor: '#e74c3c', color: '#e74c3c' }}>
+                      <span className="summary-label">TOTALE DA PAGARE<br /><span style={{ color: '#3498db' }}>(CON INTERESSI)</span></span>
                       <span className="summary-value" style={{ color: '#e74c3c' }}>{(financing.totalAmount + interestPerRate * financing.totalMonths).toFixed(2)} €</span>
                     </div>
-                    <div className="summary-box" style={{ borderColor: '#1abc9c' }}>
-                      <span className="summary-label">TOTALE PAGATO CON INTERESSI</span>
-                      <span className="summary-value" style={{ color: '#1abc9c' }}>{(paid > 0 ? paid : 0).toFixed(2)} €</span>
+                    <div className="summary-box" style={{ borderColor: '#1abc9c', color: '#1abc9c' }}>
+                      <span className="summary-label">TOTALE PAGATO<br /><span style={{ color: '#3498db' }}>(CON INTERESSI)</span></span>
+                      <span className="summary-value" style={{ color: '#1abc9c' }}>{fmtEuro(paid > 0 ? paid : 0)}</span>
                     </div>
-                    <div className="summary-box" style={{ borderColor: '#f1c40f' }}>
-                      <span className="summary-label">RESTANTE CON INTERESSI</span>
+                    <div className="summary-box" style={{ borderColor: '#f1c40f', color: '#f1c40f' }}>
+                      <span className="summary-label">RESTANTE<br /><span style={{ color: '#3498db' }}>(CON INTERESSI)</span></span>
                       <span className="summary-value" style={{ color: '#f1c40f' }}>{(() => {
                         const totalRatesPaidR = financing.payments.length + (financing.initialPaidRates || 0);
                         const capitalRemaining = financing.totalAmount - (paid - interestPerRate * totalRatesPaidR > 0 ? paid - interestPerRate * totalRatesPaidR : 0);
                         const interestRemaining = interestPerRate * (financing.totalMonths - totalRatesPaidR);
-                        return Math.max(capitalRemaining + interestRemaining, 0).toFixed(2);
-                      })()} €</span>
+                        return fmtEuro(Math.max(capitalRemaining + interestRemaining, 0));
+                      })()}</span>
                     </div>
                   </>
                 );
@@ -369,8 +436,7 @@ export default function DetailPage({ financings, onUpdate }: Props) {
             <span className="progress-percent">{progress.toFixed(1)}%</span>
           </div>
           {(() => {
-            const totalRatesPaidProg = financing.payments.length + (financing.initialPaidRates || 0);
-            const interestPaidProg = financing.interestPerRate ? financing.interestPerRate * totalRatesPaidProg : 0;
+            const interestPaidProg = financing.interestPerRate ? financing.interestPerRate * totalPaymentsCount : 0;
             const capitalPaidProg = paid - interestPaidProg;
             const progressCapital = financing.totalAmount > 0 ? (Math.max(capitalPaidProg, 0) / financing.totalAmount) * 100 : 0;
             const totalRates = financing.totalMonths || 0;
@@ -394,11 +460,14 @@ export default function DetailPage({ financings, onUpdate }: Props) {
 
         {/* RATE IRREGOLARI */}
         {isFixed && (() => {
-          const irregularPayments = financing.payments.filter(p => p.amount !== rateAmount);
+          const irregularPayments = financing.payments.filter(p => isIrregularPayment(p));
           const totalPaidRates = financing.payments.reduce((sum, p) => sum + p.amount, 0);
-          const expectedTotal = financing.payments.length * rateAmount;
-          const balance = totalPaidRates - expectedTotal;
+          const expectedTotal = effectiveRatesFromPayments * rateAmount;
+          // Sottrai l'eccesso da cap per non contarlo doppio
+          const balance = totalPaidRates - excessCredit - expectedTotal;
           const isBalanced = Math.abs(balance) < 0.01;
+          // Credito totale: irregolarità + eccesso cap
+          const totalCreditIrreg = (balance > 0.01 ? balance : 0) + excessCredit;
           // always show section
           return (
             <div className="card section-card">
@@ -412,35 +481,73 @@ export default function DetailPage({ financings, onUpdate }: Props) {
                       <p style={{ textAlign: 'center', color: '#6b9e7d', fontStyle: 'italic', margin: '0.5rem 0' }}>Nessuna irregolarità</p>
                       <hr className="card-separator" />
                       <div className="short-pay-status-label">STATO ATTUALE</div>
-                      <div className="short-pay-balance balance-zero" style={progress >= 100 ? { borderColor: '#00c853', color: '#00c853' } : {}}>
-                        <span>{progress >= 100 ? 'Concluso' : 'Pareggio di bilancio'}</span>
-                      </div>
+                      {excessCredit > 0.01 ? (
+                        <div className="short-pay-balance balance-positive">
+                          <span>{maxReached ? 'Concluso con credito:' : 'Credito:'}</span><span>+{excessCredit.toFixed(2)} €</span>
+                        </div>
+                      ) : (
+                        <div className="short-pay-balance balance-zero" style={progress >= 100 ? { borderColor: '#00c853', color: '#00c853' } : {}}>
+                          <span>{progress >= 100 ? 'Concluso' : 'Pareggio di bilancio'}</span>
+                        </div>
+                      )}
                     </>
                   ) : (
                     <>
-                      {irregularPayments.map(p => {
-                        const diff = p.amount - rateAmount;
-                        const isOver = diff > 0;
+                      {(() => {
+                        const netBal = balance + excessCredit;
+                        const hasCapped = cappedPayments.length > 0;
+                        return irregularPayments
+                          .filter(p => {
+                            // Nascondi irregolarità con mancante se coperte dal pagamento cappato
+                            if (hasCapped && p.amount < rateAmount && netBal >= -0.01) return false;
+                            return true;
+                          })
+                          .map(p => {
+                            const diff = p.amount - rateAmount;
+                            const isOver = diff > 0;
+                            return (
+                              <div key={p.id} className={`short-pay-item ${isOver ? 'short-pay-over' : 'short-pay-under'}`}>
+                                <div className="short-pay-row-info"><span>Data:</span><span>{new Date(p.date).toLocaleDateString('it-IT')}</span></div>
+                                {p.note && <div className="short-pay-row-info"><span>Nota:</span><span className="text-note">{p.note}</span></div>}
+                                <div className="short-pay-row-info"><span>Rata fissa:</span><span>{rateAmount.toFixed(2)} €</span></div>
+                                <div className="short-pay-row-info"><span>Pagato:</span><span>{p.amount.toFixed(2)} €</span></div>
+                                <div className="short-pay-row-info">
+                                  <span>{isOver ? 'Eccedenza:' : 'Mancante:'}</span>
+                                  <span className={isOver ? 'text-green' : 'text-red'}>{Math.abs(diff).toFixed(2)} €</span>
+                                </div>
+                              </div>
+                            );
+                          });
+                      })()}
+                      {cappedPayments.map(cp => {
+                        const rataMancante = cp.ratesUsed * rateAmount + cp.accDebt;
+                        const eccedenza = cp.payment.amount - rataMancante;
                         return (
-                          <div key={p.id} className={`short-pay-item ${isOver ? 'short-pay-over' : 'short-pay-under'}`}>
-                            <div className="short-pay-row-info"><span>Data:</span><span>{new Date(p.date).toLocaleDateString('it-IT')}</span></div>
-                            {p.note && <div className="short-pay-row-info"><span>Nota:</span><span className="text-note">{p.note}</span></div>}
-                            <div className="short-pay-row-info"><span>Rata fissa:</span><span>{rateAmount.toFixed(2)} €</span></div>
-                            <div className="short-pay-row-info"><span>Pagato:</span><span>{p.amount.toFixed(2)} €</span></div>
+                          <div key={cp.payment.id} className={`short-pay-item ${eccedenza >= 0 ? 'short-pay-over' : 'short-pay-under'}`}>
+                            <div className="short-pay-row-info"><span>Data:</span><span>{new Date(cp.payment.date).toLocaleDateString('it-IT')}</span></div>
+                            {cp.payment.note && <div className="short-pay-row-info"><span>Nota:</span><span className="text-note">{cp.payment.note}</span></div>}
+                            <div className="short-pay-row-info"><span>Rata mancante:</span><span>{rataMancante.toFixed(2)} €</span></div>
+                            <div className="short-pay-row-info"><span>Pagato:</span><span>{cp.payment.amount.toFixed(2)} €</span></div>
                             <div className="short-pay-row-info">
-                              <span>{isOver ? 'Eccedenza:' : 'Mancante:'}</span>
-                              <span className={isOver ? 'text-green' : 'text-red'}>{Math.abs(diff).toFixed(2)} €</span>
+                              <span>{eccedenza >= 0 ? 'Eccedenza:' : 'Mancante:'}</span>
+                              <span className={eccedenza >= 0 ? 'text-green' : 'text-red'}>{Math.abs(eccedenza).toFixed(2)} €</span>
                             </div>
                           </div>
                         );
                       })}
                       <hr className="card-separator" />
                       <div className="short-pay-status-label">STATO ATTUALE</div>
-                      <div className={`short-pay-balance ${isBalanced ? 'balance-zero' : balance > 0 ? 'balance-positive' : 'balance-negative'}`}>
-                        <span>{isBalanced ? (progress >= 100 ? 'Concluso' : 'Pareggio di bilancio') : balance > 0 ? 'Credito:' : 'Debito rata:'}</span>
-                        {!isBalanced && <span>{balance > 0 ? '+' : '-'}{Math.abs(balance).toFixed(2)} €</span>}
-                      </div>
-                      {!isBalanced && balance < 0 && (
+                      {(() => {
+                        const netBalance = balance + excessCredit;
+                        const netBalanced = Math.abs(netBalance) < 0.01;
+                        return (
+                          <div className={`short-pay-balance ${netBalanced ? 'balance-zero' : netBalance > 0 ? 'balance-positive' : 'balance-negative'}`} style={netBalanced && progress >= 100 ? { borderColor: '#00c853', color: '#00c853' } : {}}>
+                            <span>{netBalanced ? (progress >= 100 ? 'Concluso' : 'Pareggio di bilancio') : netBalance > 0 ? (maxReached ? 'Concluso con credito:' : 'Credito:') : (maxReached ? 'Concluso con debito rata:' : 'Debito rata:')}</span>
+                            {!netBalanced && <span>{netBalance > 0 ? '+' : '-'}{Math.abs(netBalance).toFixed(2)} €</span>}
+                          </div>
+                        );
+                      })()}
+                      {!isBalanced && balance < 0 && !maxReached && (
                         <div className="next-rate-hint">
                           <span>Prossima rata per il pareggio: <strong>{(rateAmount + Math.abs(balance)).toFixed(2)} €</strong></span>
                           <button
@@ -487,13 +594,17 @@ export default function DetailPage({ financings, onUpdate }: Props) {
                     <div className="short-pay-balance balance-zero" style={progress >= 100 ? { borderColor: '#00c853', color: '#00c853' } : {}}>
                       <span>{progress >= 100 ? 'Concluso' : 'Pareggio di bilancio'}</span>
                     </div>
-                  ) : (
-                    <div className={`short-pay-balance ${isBalanced ? 'balance-zero' : balance > 0 ? 'balance-positive' : 'balance-negative'}`} style={isBalanced && progress >= 100 ? { borderColor: '#00c853', color: '#00c853' } : {}}>
-                      <span>{isBalanced ? (progress >= 100 ? 'Concluso' : 'Pareggio di bilancio') : balance > 0 ? 'Credito:' : 'Debito rata:'}</span>
-                      {!isBalanced && <span>{balance > 0 ? '+' : '-'}{Math.abs(balance).toFixed(2)} €</span>}
-                    </div>
-                  )}
-                  {!isBalanced && balance < 0 && !dismissedIrregulars && (
+                  ) : (() => {
+                    const netBalance = balance + excessCredit;
+                    const netBalanced = Math.abs(netBalance) < 0.01;
+                    return (
+                      <div className={`short-pay-balance ${netBalanced ? 'balance-zero' : netBalance > 0 ? 'balance-positive' : 'balance-negative'}`} style={netBalanced && progress >= 100 ? { borderColor: '#00c853', color: '#00c853' } : {}}>
+                        <span>{netBalanced ? (progress >= 100 ? 'Concluso' : 'Pareggio di bilancio') : netBalance > 0 ? (maxReached ? 'Concluso con credito:' : 'Credito:') : (maxReached ? 'Concluso con debito rata:' : 'Debito rata:')}</span>
+                        {!netBalanced && <span>{netBalance > 0 ? '+' : '-'}{Math.abs(netBalance).toFixed(2)} €</span>}
+                      </div>
+                    );
+                  })()}
+                  {!isBalanced && balance < 0 && !dismissedIrregulars && !maxReached && (
                     <div className="next-rate-hint">
                       <span>Prossima rata per il pareggio: <strong>{(rateAmount + Math.abs(balance)).toFixed(2)} €</strong></span>
                       <button
@@ -519,8 +630,14 @@ export default function DetailPage({ financings, onUpdate }: Props) {
         })()}
 
         {/* AGGIUNGI PAGAMENTO */}
-        <div className="card section-card" ref={addPaymentRef}>
+        <div className="card section-card" ref={addPaymentRef} style={maxReached ? { opacity: 0.5, pointerEvents: 'none' } : {}}>
           <h3 className="section-heading" style={{ textAlign: 'center' }}>💳 AGGIUNGI PAGAMENTO</h3>
+          {maxReached && (() => {
+            const netBal = debtAmount + excessCredit;
+            if (netBal > 0.01) return <p style={{ textAlign: 'center', color: '#27ae60', fontWeight: 'bold', fontSize: '0.8rem', margin: '0 0 0.5rem' }}>Concluso con credito di {netBal.toFixed(2)} €</p>;
+            if (netBal < -0.01) return <p style={{ textAlign: 'center', color: '#e74c3c', fontWeight: 'bold', fontSize: '0.8rem', margin: '0 0 0.5rem' }}>Concluso con debito di {Math.abs(netBal).toFixed(2)} €</p>;
+            return <p style={{ textAlign: 'center', color: '#27ae60', fontWeight: 'bold', fontSize: '0.8rem', margin: '0 0 0.5rem' }}>Tutte le rate sono state pagate!</p>;
+          })()}
           <div className="amount-row">
             {isFixed && isModified && (
               <button className="btn-refresh" onClick={() => {
@@ -566,16 +683,28 @@ export default function DetailPage({ financings, onUpdate }: Props) {
         {/* STORICO PAGAMENTI */}
         <div className="card section-card">
             <h3 className="section-heading" style={{ textAlign: 'center' }}>📋 STORICO PAGAMENTI</h3>
-            {financing.payments.length === 0 ? (
+            {financing.payments.length === 0 && (
               <p style={{ textAlign: 'center', color: '#6b9e7d', fontStyle: 'italic' }}>Nessun pagamento registrato</p>
-            ) : (
+            )}
+            {financing.payments.length > 0 && (
             <div className="payments-list">
               <div className="payment-header">
                 <span className="payment-col-date">Data</span>
                 <span className="payment-col-amount">Importo</span>
                 <span className="payment-col-note">Note</span>
                 <span className="payment-col-spacer"></span>
-                <span className="payment-col-actions"></span>
+                <span className="payment-col-actions" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                  {financing.totalMonths > 0 && (() => {
+                    const netBal = debtAmount + excessCredit;
+                    const badgeColor = maxReached ? (Math.abs(netBal) < 0.01 ? '#27ae60' : netBal > 0 ? '#3498db' : '#e74c3c') : '#333';
+                    const badgeBg = maxReached ? (Math.abs(netBal) < 0.01 ? '#eafaf1' : netBal > 0 ? '#ebf5fb' : '#fdecea') : '#f0f0f0';
+                    return (
+                      <span style={{ fontSize: '0.7rem', fontWeight: 'bold', color: badgeColor, background: badgeBg, padding: '1px 6px', borderRadius: '1rem', whiteSpace: 'nowrap' }}>
+                        {totalPaymentsCount}/{financing.totalMonths}
+                      </span>
+                    );
+                  })()}
+                </span>
               </div>
               {[...financing.payments].reverse().map((p) => (
                 <div key={p.id}>
@@ -602,80 +731,184 @@ export default function DetailPage({ financings, onUpdate }: Props) {
               ))}
             </div>
             )}
+            {financing.payments.length > 0 && (() => {
+              const totalePagato = financing.payments.reduce((s, p) => s + p.amount, 0);
+              const netDiff = debtAmount + excessCredit;
+              return (
+                <div style={{ marginTop: '0.75rem', textAlign: 'center' }}>
+                  <hr style={{ border: 'none', borderTop: '1px solid rgba(0,0,0,0.1)', margin: '0.5rem 0' }} />
+                  <div style={{ fontWeight: 'bold', fontSize: '0.85rem', color: '#333' }}>
+                    Totale pagato: {totalePagato.toFixed(2)} €
+                  </div>
+                  {isFixed && Math.abs(netDiff) >= 0.01 && (
+                    <div style={{ fontSize: '0.8rem', fontWeight: 'bold', marginTop: '0.25rem', color: netDiff > 0 ? '#2ecc71' : '#e74c3c' }}>
+                      {maxReached
+                        ? (netDiff > 0 ? `Concluso con credito: +${netDiff.toFixed(2)} €` : `Concluso con debito: ${Math.abs(netDiff).toFixed(2)} €`)
+                        : (netDiff > 0 ? `Credito: +${netDiff.toFixed(2)} €` : `Debito: ${Math.abs(netDiff).toFixed(2)} €`)
+                      }
+                    </div>
+                  )}
+                  {isFixed && Math.abs(netDiff) < 0.01 && maxReached && (
+                    <div style={{ fontSize: '0.8rem', fontWeight: 'bold', marginTop: '0.25rem', color: '#27ae60' }}>
+                      Concluso
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
 
         {/* ESPORTA EXCEL */}
-        <div style={{ textAlign: 'center', margin: '1.5rem 0' }}>
+        <hr style={{ border: 'none', borderTop: '1.5px solid rgba(0,0,0,0.15)', margin: '1rem 1rem 0' }} />
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', margin: '1rem 0 1.5rem', flexWrap: 'nowrap' }}>
           <button
             className="btn-excel"
+            style={{ flex: 1, padding: '0.75rem 0.5rem', fontSize: '0.85rem', justifyContent: 'center' }}
             onClick={() => {
               const wb = XLSX.utils.book_new();
-              const totalRatesPaidX = financing.payments.length + (financing.initialPaidRates || 0);
               const interestPerRateX = financing.interestPerRate ?? 0;
-              const interestPaidX = interestPerRateX * totalRatesPaidX;
+              const interestPaidX = interestPerRateX * totalPaymentsCount;
               const capitalPaidX = Math.max(paid - interestPaidX, 0);
+              const totalWithInterestX = financing.totalAmount + interestPerRateX * financing.totalMonths;
+              const netBalX = debtAmount + excessCredit;
+              const situazioneLabel = maxReached
+                ? (Math.abs(netBalX) < 0.01 ? 'Concluso' : netBalX > 0 ? 'Concluso con credito' : 'Concluso con debito')
+                : (Math.abs(netBalX) < 0.01 ? 'In corso - Pareggio' : netBalX > 0 ? 'In corso - Credito' : 'In corso - Debito');
 
               // --- Foglio 1: Riepilogo ---
-              const riepilogo = [];
+              const riepilogo: any[][] = [];
               riepilogo.push(['DATI FINANZIAMENTO', '']);
               riepilogo.push(['Campo', 'Valore']);
               riepilogo.push(['Nome', financing.name]);
-              riepilogo.push(['Totale da pagare', financing.totalAmount.toFixed(2) + ' €']);
+              riepilogo.push(['Totale da pagare (senza interessi)', financing.totalAmount.toFixed(2) + ' €']);
+              if (interestPerRateX > 0) riepilogo.push(['Totale da pagare (con interessi)', totalWithInterestX.toFixed(2) + ' €']);
               riepilogo.push(['Rate totali', financing.totalMonths]);
               riepilogo.push(['Tipo rata', financing.rateType.charAt(0).toUpperCase() + financing.rateType.slice(1)]);
               riepilogo.push(['Modalita rata', financing.rateMode.charAt(0).toUpperCase() + financing.rateMode.slice(1)]);
+              if (isFixed) riepilogo.push(['Rata fissa', rateAmount.toFixed(2) + ' €']);
+              if (interestPerRateX > 0) riepilogo.push(['Interessi per rata', interestPerRateX.toFixed(2) + ' €']);
               riepilogo.push(['Data inizio', financing.startDate ? new Date(financing.startDate).toLocaleDateString('it-IT') : '-']);
               riepilogo.push(['Data fine', financing.endDate ? new Date(financing.endDate).toLocaleDateString('it-IT') : '-']);
-              if (rateAmount > 0) riepilogo.push(['Importo rata', rateAmount.toFixed(2) + ' €']);
-              if (interestPerRateX > 0) riepilogo.push(['Interessi per rata', interestPerRateX.toFixed(2) + ' €']);
               riepilogo.push(['', '']);
               riepilogo.push(['SITUAZIONE PAGAMENTI', '']);
               riepilogo.push(['Campo', 'Valore']);
-              riepilogo.push(['Pagato (capitale)', capitalPaidX.toFixed(2) + ' €']);
-              riepilogo.push(['Interessi pagati', interestPaidX.toFixed(2) + ' €']);
+              riepilogo.push(['Situazione', situazioneLabel]);
+              if (Math.abs(netBalX) >= 0.01) riepilogo.push([netBalX > 0 ? 'Credito' : 'Debito', (netBalX > 0 ? '+' : '') + netBalX.toFixed(2) + ' €']);
+              riepilogo.push(['Pagato (senza interessi)', capitalPaidX.toFixed(2) + ' €']);
+              if (interestPerRateX > 0) riepilogo.push(['Interessi pagati', interestPaidX.toFixed(2) + ' €']);
               riepilogo.push(['Totale versato', paid.toFixed(2) + ' €']);
-              riepilogo.push(['Restante', Math.max(financing.totalAmount - paid, 0).toFixed(2) + ' €']);
+              riepilogo.push(['Restante (senza interessi)', Math.max(financing.totalAmount - capitalPaidX, 0).toFixed(2) + ' €']);
+              if (interestPerRateX > 0) {
+                const capitalRem = Math.max(financing.totalAmount - capitalPaidX, 0);
+                const interestRem = Math.max(interestPerRateX * (financing.totalMonths - totalPaymentsCount), 0);
+                riepilogo.push(['Restante (con interessi)', Math.max(capitalRem + interestRem, 0).toFixed(2) + ' €']);
+              }
               riepilogo.push(['', '']);
               riepilogo.push(['AVANZAMENTO RATE', '']);
               riepilogo.push(['Campo', 'Valore']);
-              riepilogo.push(['Rate pagate', totalRatesPaidX]);
-              riepilogo.push(['Rate rimanenti', Math.max(financing.totalMonths - totalRatesPaidX, 0)]);
-              riepilogo.push(['Avanzamento', totalRatesPaidX + ' / ' + financing.totalMonths]);
+              riepilogo.push(['Rate pagate (effettive)', totalPaymentsCount]);
+              riepilogo.push(['Rate rimanenti', Math.max(financing.totalMonths - totalPaymentsCount, 0)]);
+              riepilogo.push(['Avanzamento', totalPaymentsCount + ' / ' + financing.totalMonths]);
+              riepilogo.push(['Progresso', progress.toFixed(1) + '%']);
 
               const wsRiepilogo = XLSX.utils.aoa_to_sheet(riepilogo);
-              wsRiepilogo['!cols'] = [{ wch: 24 }, { wch: 22 }];
+              wsRiepilogo['!cols'] = [{ wch: 32 }, { wch: 22 }];
               XLSX.utils.book_append_sheet(wb, wsRiepilogo, 'Riepilogo');
 
               // --- Foglio 2: Storico pagamenti ---
               const payments = [...financing.payments].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
               const hasInterest = interestPerRateX > 0;
-              const storico = [];
+              const storico: any[][] = [];
               if (hasInterest) {
-                storico.push(['N.', 'Data', 'Importo totale', 'Capitale', 'Interessi', 'Note']);
+                storico.push(['N.', 'Data', 'Importo totale', 'Capitale', 'Interessi', 'Rate effettive', 'Note']);
                 payments.forEach((p, i) => {
-                  const cap = Math.max(p.amount - interestPerRateX, 0);
-                  storico.push([i + 1, new Date(p.date).toLocaleDateString('it-IT'), p.amount.toFixed(2) + ' €', cap.toFixed(2) + ' €', interestPerRateX.toFixed(2) + ' €', p.note || '']);
+                  const effRates = countEffectiveRates(p);
+                  const cap = Math.max(p.amount - interestPerRateX * effRates, 0);
+                  storico.push([i + 1, new Date(p.date).toLocaleDateString('it-IT'), p.amount.toFixed(2) + ' €', cap.toFixed(2) + ' €', (interestPerRateX * effRates).toFixed(2) + ' €', effRates, p.note || '']);
                 });
                 storico.push([]);
-                storico.push(['', 'TOTALE', payments.reduce((s, p) => s + p.amount, 0).toFixed(2) + ' €', capitalPaidX.toFixed(2) + ' €', interestPaidX.toFixed(2) + ' €', '']);
+                const totalPaid = payments.reduce((s, p) => s + p.amount, 0);
+                storico.push(['', 'TOTALE', totalPaid.toFixed(2) + ' €', capitalPaidX.toFixed(2) + ' €', interestPaidX.toFixed(2) + ' €', effectiveRatesFromPayments, '']);
               } else {
-                storico.push(['N.', 'Data', 'Importo', 'Note']);
+                storico.push(['N.', 'Data', 'Importo', 'Rate effettive', 'Note']);
                 payments.forEach((p, i) => {
-                  storico.push([i + 1, new Date(p.date).toLocaleDateString('it-IT'), p.amount.toFixed(2) + ' €', p.note || '']);
+                  storico.push([i + 1, new Date(p.date).toLocaleDateString('it-IT'), p.amount.toFixed(2) + ' €', countEffectiveRates(p), p.note || '']);
                 });
                 storico.push([]);
-                storico.push(['', 'TOTALE', payments.reduce((s, p) => s + p.amount, 0).toFixed(2) + ' €', '']);
+                storico.push(['', 'TOTALE', payments.reduce((s, p) => s + p.amount, 0).toFixed(2) + ' €', effectiveRatesFromPayments, '']);
+              }
+              if (Math.abs(netBalX) >= 0.01) {
+                storico.push([]);
+                storico.push(['', netBalX > 0 ? 'CREDITO' : 'DEBITO', (netBalX > 0 ? '+' : '') + netBalX.toFixed(2) + ' €']);
               }
               const wsStorico = XLSX.utils.aoa_to_sheet(storico);
               wsStorico['!cols'] = hasInterest
-                ? [{ wch: 5 }, { wch: 14 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 28 }]
-                : [{ wch: 5 }, { wch: 14 }, { wch: 16 }, { wch: 28 }];
+                ? [{ wch: 5 }, { wch: 14 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 28 }]
+                : [{ wch: 5 }, { wch: 14 }, { wch: 16 }, { wch: 14 }, { wch: 28 }];
               XLSX.utils.book_append_sheet(wb, wsStorico, 'Storico Pagamenti');
 
-              XLSX.writeFile(wb, financing.name + '_finanziamento.xlsx');
+              try {
+                XLSX.writeFile(wb, financing.name + '_finanziamento.xlsx', { bookType: 'xlsx' });
+              } catch (err) {
+                console.error('Errore export Excel:', err);
+                alert('Errore durante l\'esportazione: ' + (err as Error).message);
+              }
             }}
           >
             <span className="btn-excel-icon">X</span> Esporta in Excel
+          </button>
+          <button
+            className="btn-excel btn-copy"
+            style={{ flex: 1, padding: '0.75rem 0.5rem', fontSize: '0.85rem', justifyContent: 'center' }}
+            onClick={() => {
+              const interestPerRateX = financing.interestPerRate ?? 0;
+              const interestPaidX = interestPerRateX * totalPaymentsCount;
+              const capitalPaidX = Math.max(paid - interestPaidX, 0);
+              const totalWithInterestX = financing.totalAmount + interestPerRateX * financing.totalMonths;
+              const netBalX = debtAmount + excessCredit;
+              const situazioneLabel = maxReached
+                ? (Math.abs(netBalX) < 0.01 ? 'Concluso' : netBalX > 0 ? 'Concluso con credito' : 'Concluso con debito')
+                : (Math.abs(netBalX) < 0.01 ? 'In corso - Pareggio' : netBalX > 0 ? 'In corso - Credito' : 'In corso - Debito');
+
+              let text = `📊 RIEPILOGO - ${financing.name}\n`;
+              text += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+              text += `📋 DATI FINANZIAMENTO\n`;
+              text += `Totale da pagare: ${financing.totalAmount.toFixed(2)} €\n`;
+              if (interestPerRateX > 0) text += `Totale con interessi: ${totalWithInterestX.toFixed(2)} €\n`;
+              text += `Rate totali: ${financing.totalMonths}\n`;
+              text += `Tipo rata: ${financing.rateType.charAt(0).toUpperCase() + financing.rateType.slice(1)}\n`;
+              text += `Modalità: ${financing.rateMode.charAt(0).toUpperCase() + financing.rateMode.slice(1)}\n`;
+              if (isFixed) text += `Rata fissa: ${rateAmount.toFixed(2)} €\n`;
+              if (interestPerRateX > 0) text += `Interessi per rata: ${interestPerRateX.toFixed(2)} €\n`;
+              if (financing.startDate) text += `Periodo: ${new Date(financing.startDate).toLocaleDateString('it-IT')} - ${financing.endDate ? new Date(financing.endDate).toLocaleDateString('it-IT') : '-'}\n`;
+              text += `\n💰 SITUAZIONE\n`;
+              text += `Stato: ${situazioneLabel}\n`;
+              if (Math.abs(netBalX) >= 0.01) text += `${netBalX > 0 ? 'Credito' : 'Debito'}: ${netBalX > 0 ? '+' : ''}${netBalX.toFixed(2)} €\n`;
+              text += `Pagato (senza interessi): ${capitalPaidX.toFixed(2)} €\n`;
+              if (interestPerRateX > 0) text += `Interessi pagati: ${interestPaidX.toFixed(2)} €\n`;
+              text += `Totale versato: ${paid.toFixed(2)} €\n`;
+              text += `Restante: ${Math.max(financing.totalAmount - capitalPaidX, 0).toFixed(2)} €\n`;
+              text += `\n📈 AVANZAMENTO\n`;
+              text += `Rate pagate: ${totalPaymentsCount} / ${financing.totalMonths}\n`;
+              text += `Progresso: ${progress.toFixed(1)}%\n`;
+              text += `\n📋 STORICO PAGAMENTI\n`;
+              text += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+              const payments = [...financing.payments].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+              payments.forEach((p, i) => {
+                const effRates = countEffectiveRates(p);
+                text += `${i + 1}. ${new Date(p.date).toLocaleDateString('it-IT')} - ${p.amount.toFixed(2)} €`;
+                if (effRates > 1) text += ` (x${effRates} rate)`;
+                if (p.note) text += ` [${p.note}]`;
+                text += `\n`;
+              });
+              text += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+              text += `Totale: ${payments.reduce((s, p) => s + p.amount, 0).toFixed(2)} €\n`;
+              if (Math.abs(netBalX) >= 0.01) text += `${netBalX > 0 ? 'Credito' : 'Debito'}: ${netBalX > 0 ? '+' : ''}${netBalX.toFixed(2)} €\n`;
+
+              navigator.clipboard.writeText(text).then(() => showToast('Dati copiati negli appunti!', '#3498db'));
+            }}
+          >
+            <span className="btn-excel-icon">📋</span> Copia dati
           </button>
         </div>
       </div>
