@@ -174,13 +174,9 @@ export default function DetailPage({ financings, onUpdate }: Props) {
 
   // Credito: eccedenza da pagamenti multipli che superano il cap + eventuale eccedenza rispetto al totale con interessi
   const totalePagatoAll = financing.payments.reduce((s, p) => s + p.amount, 0);
-  const hasCredit = isFixed && excessCredit > 0.01;
-  const overpaidAmount = excessCredit;
-
   // Debito: pagato meno del dovuto in base alle rate effettive (cappate)
   const totaleDovutoAll = rateAmount > 0 ? rateAmount * effectiveRatesFromPayments : 0;
   const debtAmount = totalePagatoAll - excessCredit - totaleDovutoAll;
-  const hasDebt = isFixed && debtAmount < -0.01;
 
   const addPayment = () => {
     if (maxReached) return;
@@ -215,7 +211,7 @@ export default function DetailPage({ financings, onUpdate }: Props) {
       const set = saved ? new Set(JSON.parse(saved)) : new Set();
       set.delete(id);
       localStorage.setItem('dismissedAlerts', JSON.stringify([...set]));
-    } catch {}
+    } catch { /* ignore */ }
     if (isFixed) {
       setShowIrregulars(true);
     }
@@ -466,8 +462,6 @@ export default function DetailPage({ financings, onUpdate }: Props) {
           // Sottrai l'eccesso da cap per non contarlo doppio
           const balance = totalPaidRates - excessCredit - expectedTotal;
           const isBalanced = Math.abs(balance) < 0.01;
-          // Credito totale: irregolarità + eccesso cap
-          const totalCreditIrreg = (balance > 0.01 ? balance : 0) + excessCredit;
           // always show section
           return (
             <div className="card section-card">
@@ -576,7 +570,7 @@ export default function DetailPage({ financings, onUpdate }: Props) {
                               const set = saved ? new Set(JSON.parse(saved)) : new Set();
                               set.add(id);
                               localStorage.setItem('dismissedAlerts', JSON.stringify([...set]));
-                            } catch {}
+                            } catch { /* ignore */ }
                           }}
                         >
                           Elimina irregolarità
@@ -776,7 +770,7 @@ export default function DetailPage({ financings, onUpdate }: Props) {
                 : (Math.abs(netBalX) < 0.01 ? 'In corso - Pareggio' : netBalX > 0 ? 'In corso - Credito' : 'In corso - Debito');
 
               // --- Foglio 1: Riepilogo ---
-              const riepilogo: any[][] = [];
+              const riepilogo: (string | number)[][] = [];
               riepilogo.push(['DATI FINANZIAMENTO', '']);
               riepilogo.push(['Campo', 'Valore']);
               riepilogo.push(['Nome', financing.name]);
@@ -818,7 +812,7 @@ export default function DetailPage({ financings, onUpdate }: Props) {
               // --- Foglio 2: Storico pagamenti ---
               const payments = [...financing.payments].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
               const hasInterest = interestPerRateX > 0;
-              const storico: any[][] = [];
+              const storico: (string | number)[][] = [];
               if (hasInterest) {
                 storico.push(['N.', 'Data', 'Importo totale', 'Capitale', 'Interessi', 'Rate effettive', 'Note']);
                 payments.forEach((p, i) => {

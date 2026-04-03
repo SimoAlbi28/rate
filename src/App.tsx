@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import type { Financing, RateType } from './types';
 import { loadFinancings, saveFinancings } from './storage';
@@ -7,11 +7,7 @@ import DetailPage from './components/DetailPage';
 import './App.css';
 
 export default function App() {
-  const [financings, setFinancings] = useState<Financing[]>([]);
-
-  useEffect(() => {
-    setFinancings(loadFinancings());
-  }, []);
+  const [financings, setFinancings] = useState<Financing[]>(() => loadFinancings());
 
   const persist = (updated: Financing[]) => {
     setFinancings(updated);

@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect, useLayoutEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, X, ArrowUpDown } from 'lucide-react';
+import { Plus, Search, X } from 'lucide-react';
 import { AppsListDetail24Regular } from '@fluentui/react-icons';
 import type { Financing, RateType, Payment } from '../types';
 
@@ -356,39 +356,39 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
     });
 
   // FLIP animation: detect order changes
-  const currentOrder = filteredFinancings.map(f => f.id);
-  const orderChanged = currentOrder.join(',') !== prevOrder.current.join(',') && prevOrder.current.length > 0;
+  const currentOrderKey = filteredFinancings.map(f => f.id).join(',');
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    // Animate cards that moved
+    const prevOrderStr = prevOrder.current.join(',');
+    if (prevOrderStr && prevOrderStr !== currentOrderKey) {
+      cardRefs.current.forEach((el, id) => {
+        if (!el) return;
+        const prev = prevPositions.current.get(id);
+        if (!prev) return;
+        const curr = el.getBoundingClientRect();
+        const deltaY = prev.top - curr.top;
+        const deltaX = prev.left - curr.left;
+        if (Math.abs(deltaY) < 2 && Math.abs(deltaX) < 2) return;
+        el.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+        el.style.transition = 'none';
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            el.style.transform = '';
+            el.style.transition = 'transform 0.4s ease';
+            el.addEventListener('transitionend', () => { el.style.transition = ''; }, { once: true });
+          });
+        });
+      });
+    }
+    // Save current positions and order for next render
     const positions = new Map<string, DOMRect>();
     cardRefs.current.forEach((el, id) => {
       if (el) positions.set(id, el.getBoundingClientRect());
     });
     prevPositions.current = positions;
-    prevOrder.current = currentOrder;
-  });
-
-  useLayoutEffect(() => {
-    if (!orderChanged) return;
-    cardRefs.current.forEach((el, id) => {
-      if (!el) return;
-      const prev = prevPositions.current.get(id);
-      if (!prev) return;
-      const curr = el.getBoundingClientRect();
-      const deltaY = prev.top - curr.top;
-      const deltaX = prev.left - curr.left;
-      if (Math.abs(deltaY) < 2 && Math.abs(deltaX) < 2) return;
-      el.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
-      el.style.transition = 'none';
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          el.style.transform = '';
-          el.style.transition = 'transform 0.4s ease';
-          el.addEventListener('transitionend', () => { el.style.transition = ''; }, { once: true });
-        });
-      });
-    });
-  });
+    prevOrder.current = filteredFinancings.map(f => f.id);
+  }, [currentOrderKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const lpTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lpInterval = useRef<ReturnType<typeof setInterval> | null>(null);
