@@ -1,6 +1,6 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useLayoutEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, X } from 'lucide-react';
+import { Plus, Search, X, ArrowUpDown } from 'lucide-react';
 import { AppsListDetail24Regular } from '@fluentui/react-icons';
 import type { Financing, RateType, Payment } from '../types';
 
@@ -118,6 +118,17 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
   const [singleRates, setSingleRates] = useState<{ int: string; dec: string; date: string }[]>([]);
   const [missingDates, setMissingDates] = useState<Set<number>>(new Set());
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
+
+  // FLIP animation refs
+  const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const prevPositions = useRef<Map<string, DOMRect>>(new Map());
+  const prevOrder = useRef<string[]>([]);
+  const [sortMode, setSortMode] = useState<'default' | 'progress-desc' | 'progress-asc'>(() => {
+    const saved = localStorage.getItem('sortMode');
+    if (saved === 'progress-desc' || saved === 'progress-asc') return saved;
+    return 'default';
+  });
+  const [showSortMenu, setShowSortMenu] = useState(false);
   const dateRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [initialPaidInt, setInitialPaidInt] = useState('');
   const [initialPaidDec, setInitialPaidDec] = useState('');
@@ -329,10 +340,55 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
       return true;
     })
     .sort((a, b) => {
+      if (sortMode !== 'default') {
+        const getProgress = (f: Financing) => {
+          const p = f.payments.reduce((s, pp) => s + pp.amount, 0) + (f.initialPaid || 0);
+          const intP = f.interestPerRate ? f.interestPerRate * (f.payments.length + (f.initialPaidRates || 0)) : 0;
+          const capP = Math.max(p - intP, 0);
+          return f.totalAmount > 0 ? (capP / f.totalAmount) * 100 : 0;
+        };
+        if (sortMode === 'progress-desc') return getProgress(b) - getProgress(a);
+        if (sortMode === 'progress-asc') return getProgress(a) - getProgress(b);
+      }
       if (filterType === 'debito') return getBalance(a) - getBalance(b);
       if (filterType === 'credito') return getBalance(b) - getBalance(a);
       return a.name.localeCompare(b.name);
     });
+
+  // FLIP animation: detect order changes
+  const currentOrder = filteredFinancings.map(f => f.id);
+  const orderChanged = currentOrder.join(',') !== prevOrder.current.join(',') && prevOrder.current.length > 0;
+
+  useEffect(() => {
+    const positions = new Map<string, DOMRect>();
+    cardRefs.current.forEach((el, id) => {
+      if (el) positions.set(id, el.getBoundingClientRect());
+    });
+    prevPositions.current = positions;
+    prevOrder.current = currentOrder;
+  });
+
+  useLayoutEffect(() => {
+    if (!orderChanged) return;
+    cardRefs.current.forEach((el, id) => {
+      if (!el) return;
+      const prev = prevPositions.current.get(id);
+      if (!prev) return;
+      const curr = el.getBoundingClientRect();
+      const deltaY = prev.top - curr.top;
+      const deltaX = prev.left - curr.left;
+      if (Math.abs(deltaY) < 2 && Math.abs(deltaX) < 2) return;
+      el.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+      el.style.transition = 'none';
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          el.style.transform = '';
+          el.style.transition = 'transform 0.4s ease';
+          el.addEventListener('transitionend', () => { el.style.transition = ''; }, { once: true });
+        });
+      });
+    });
+  });
 
   const lpTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lpInterval = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -595,6 +651,48 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
         <div className="sticky-bar">
           <h2 className="section-title">CARTELLE</h2>
           <div className="toolbar">
+            <div style={{ position: 'relative' }}>
+              <button
+                className="toolbar-btn"
+                onClick={() => setShowSortMenu(!showSortMenu)}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', width: 50, height: 42, padding: 0, boxSizing: 'border-box' }}
+                title="Ordinamento"
+              >
+                {sortMode === 'default' && <span style={{ fontSize: '0.7rem', fontWeight: 'bold' }}>A-Z</span>}
+                {sortMode === 'progress-desc' && <img src="/green-line.jpg" alt="" style={{ width: 22, height: 'auto' }} />}
+                {sortMode === 'progress-asc' && <img src="/red-line.jpg" alt="" style={{ width: 22, height: 'auto' }} />}
+              </button>
+              {showSortMenu && (
+                <>
+                  <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setShowSortMenu(false)} />
+                  <div style={{ position: 'absolute', top: '110%', left: 0, background: 'white', borderRadius: '0.75rem', boxShadow: '0 4px 20px rgba(0,0,0,0.15)', border: '1px solid #e0e0e0', zIndex: 100, minWidth: '200px', overflow: 'hidden' }}>
+                    {([
+                      { key: 'default' as const, label: 'Predefinito (A-Z)' },
+                      { key: 'progress-desc' as const, label: 'Più vicini al completamento' },
+                      { key: 'progress-asc' as const, label: 'Più lontani dal completamento' },
+                    ]).map((item) => (
+                      <button
+                        key={item.key}
+                        onClick={() => { setSortMode(item.key); localStorage.setItem('sortMode', item.key); setShowSortMenu(false); }}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%', padding: '0.6rem 0.75rem',
+                          background: sortMode === item.key ? '#ebf5fb' : 'transparent', border: 'none', cursor: 'pointer',
+                          fontSize: '0.78rem', color: sortMode === item.key ? '#2980b9' : '#333', fontWeight: sortMode === item.key ? 700 : 400,
+                          borderBottom: '1px solid #f0f0f0', textAlign: 'left'
+                        }}
+                      >
+                        <span style={{ width: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {item.key === 'default' && <span style={{ fontSize: '0.7rem', fontWeight: 'bold' }}>A-Z</span>}
+                          {item.key === 'progress-desc' && <img src="/green-line.jpg" alt="" style={{ width: 20, height: 'auto' }} />}
+                          {item.key === 'progress-asc' && <img src="/red-line.jpg" alt="" style={{ width: 20, height: 'auto' }} />}
+                        </span>
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
             <button className="toolbar-btn toolbar-btn-create" onClick={() => setShowModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
               <Plus size={18} /> Crea
             </button>
@@ -730,6 +828,7 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
             return (
               <div
                 key={f.id}
+                ref={(el) => { if (el) cardRefs.current.set(f.id, el); else cardRefs.current.delete(f.id); }}
                 className="card financing-card"
                 onClick={() => {
                   setExpandedCards(prev => {
