@@ -11,27 +11,47 @@ interface Props {
 export default function BottomNav({ profileIcon, profileColor }: Props) {
   const navigate = useNavigate();
   const location = useLocation();
-  const [activeTab, setActiveTab] = useState<'riepilogo' | 'home' | 'profilo'>(() => {
-    if (location.pathname === '/riepilogo') return 'riepilogo';
-    if (location.pathname === '/profilo') return 'profilo';
-    return 'home';
-  });
+  const getTab = (path: string): 'riepilogo' | 'home' | 'profilo' | null => {
+    if (path === '/riepilogo') return 'riepilogo';
+    if (path === '/profilo') return 'profilo';
+    if (path === '/') return 'home';
+    return null;
+  };
+
+  const [activeTab, setActiveTab] = useState<'riepilogo' | 'home' | 'profilo' | null>(() => getTab(location.pathname));
+  const [prevTab, setPrevTab] = useState<'riepilogo' | 'home' | 'profilo' | null>(activeTab);
+  const [skipTransition, setSkipTransition] = useState(false);
 
   useEffect(() => {
-    if (location.pathname === '/riepilogo') {
-      setActiveTab('riepilogo');
-    } else if (location.pathname === '/profilo') {
-      setActiveTab('profilo');
+    const newTab = getTab(location.pathname);
+    const wasNull = activeTab === null;
+    setPrevTab(activeTab);
+    if (wasNull && newTab !== null) {
+      setSkipTransition(true);
+      setActiveTab(newTab);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => setSkipTransition(false));
+      });
     } else {
-      setActiveTab('home');
+      setActiveTab(newTab);
     }
   }, [location.pathname]);
 
-  const leftPos = activeTab === 'riepilogo' ? '0%' : activeTab === 'home' ? '33.33%' : '66.66%';
+  const getLeft = (tab: 'riepilogo' | 'home' | 'profilo' | null) => {
+    if (tab === 'riepilogo') return '0%';
+    if (tab === 'home') return '33.33%';
+    if (tab === 'profilo') return '66.66%';
+    return '33.33%';
+  };
 
   return (
     <div className="bottom-nav">
-      <div className="bottom-nav-highlight" style={{ left: leftPos }} />
+      <div className="bottom-nav-highlight" style={{
+        left: getLeft(activeTab),
+        opacity: activeTab ? 1 : 0,
+        transform: activeTab ? 'scaleY(1)' : 'scaleY(0)',
+        transition: skipTransition ? 'opacity 0.3s ease, transform 0.3s ease' : undefined,
+      }} />
       <button
         className={`bottom-nav-btn ${activeTab === 'riepilogo' ? 'active' : ''}`}
         onClick={() => navigate('/riepilogo')}

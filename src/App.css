@@ -64,9 +64,10 @@ select {
   height: 100%;
   background: rgba(46, 204, 113, 0.1);
   border-top: 2.5px solid #27ae60;
-  transition: left 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: left 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease, transform 0.3s ease;
   pointer-events: none;
   box-sizing: border-box;
+  transform-origin: top center;
 }
 
 .bottom-nav-btn {
@@ -654,6 +655,7 @@ select {
   display: grid;
   grid-template-columns: 1fr;
   gap: 1rem;
+  animation: border-rotate 6s linear infinite;
 }
 
 .cards-grid > *:not(:last-child) {
@@ -695,14 +697,11 @@ select {
   mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   mask-composite: exclude;
   pointer-events: none;
-  animation: border-rotate 6s linear infinite;
-  animation-delay: 0s;
-  animation-fill-mode: both;
 }
 
 @property --border-angle {
   syntax: '<angle>';
-  inherits: false;
+  inherits: true;
   initial-value: 0deg;
 }
 
