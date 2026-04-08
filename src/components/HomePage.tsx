@@ -1,8 +1,9 @@
 import { useState, useRef, useCallback, useEffect, useLayoutEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, X } from 'lucide-react';
+import { Plus, Search, X, LogOut, Home } from 'lucide-react';
 import { AppsListDetail24Regular } from '@fluentui/react-icons';
 import type { Financing, RateType, Payment } from '../types';
+import { useAuth } from '../AuthContext';
 
 interface Props {
   financings: Financing[];
@@ -26,15 +27,26 @@ const PROFILE_ICONS = [
 ];
 
 const PROFILE_COLORS = [
-  '#e94560', '#f39c12', '#e67e22', '#2ecc71', '#1abc9c',
-  '#3498db', '#9b59b6', '#e84393', '#636e72', '#2d3436',
-  '#c0392b', '#d35400', '#f1c40f', '#27ae60', '#16a085',
-  '#2980b9', '#8e44ad', '#fd79a8', '#a29bfe', '#00cec9',
-  '#6c5ce7', '#fdcb6e', '#e17055', '#0984e3', '#b2bec3',
+  // Rossi: scuro → chiaro
+  '#7b241c', '#c0392b', '#e74c3c', '#f1948a', '#f5b7b1',
+  // Arancioni
+  '#784212', '#d35400', '#e67e22', '#f39c12', '#fad7a0',
+  // Verdi
+  '#145a32', '#1e8449', '#27ae60', '#2ecc71', '#abebc6',
+  // Blu
+  '#1b2631', '#1a5276', '#2980b9', '#3498db', '#aed6f1',
+  // Viola
+  '#4a235a', '#6c3483', '#8e44ad', '#a569bd', '#d2b4de',
+  // Rosa
+  '#78281f', '#b03a6e', '#e84393', '#f06292', '#f8bbd0',
+  // Grigi
+  '#1c1c1c', '#2d3436', '#636e72', '#95a5a6', '#d5dbdb',
 ];
 
 export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Props) {
   const navigate = useNavigate();
+  const { signOut, user, isGuest } = useAuth();
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [showAllEmojis, setShowAllEmojis] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -585,7 +597,7 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
             <h1>Rate & Pagamenti</h1>
             <p className="navbar-tagline">Tutto quello che devi pagare, qui.</p>
           </div>
-          <button className="navbar-profile" style={{ background: profileColor }} onClick={() => { setTempProfileIcon(profileIcon); setTempProfileColor(profileColor); setShowProfile(true); }}>
+          <button className="navbar-profile" style={{ background: profileColor }} onClick={() => setShowProfileMenu(!showProfileMenu)}>
             <span>{profileIcon}</span>
           </button>
         </nav>
@@ -1784,6 +1796,7 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
       {toast && (
         <div className="toast">{toast}</div>
       )}
+
     </div>
   );
 }
