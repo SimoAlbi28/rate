@@ -76,6 +76,15 @@ export default function DetailPage({ financings, onUpdate }: Props) {
   const [tempProfileIcon, setTempProfileIcon] = useState(profileIcon);
   const [tempProfileColor, setTempProfileColor] = useState(profileColor);
   const [showAllProfileIcons, setShowAllProfileIcons] = useState(false);
+  const [showInterestTip, setShowInterestTip] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!showInterestTip) return;
+    const close = () => setShowInterestTip(null);
+    window.addEventListener('scroll', close, true);
+    return () => window.removeEventListener('scroll', close, true);
+  }, [showInterestTip]);
+
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
   const swipeDirectionLocked = useRef<'horizontal' | 'vertical' | null>(null);
@@ -322,12 +331,8 @@ export default function DetailPage({ financings, onUpdate }: Props) {
             <span>{profileIcon}</span>
           </button>
         </nav>
-      </div>
-
-      <div className="content">
-        {/* RIEPILOGO */}
-        <div className="card section-card" style={{ position: 'relative' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0', marginBottom: '0.5rem' }}>
+        <div style={{ background: '#d0e8d2', padding: '0.5rem 1rem 0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'white', borderRadius: '1rem', padding: '0.6rem 1rem', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
             <span className="riepilogo-icon-box" onClick={() => navigate('/')} style={{ position: 'relative', width: 36, height: 36, display: 'inline-flex', flexShrink: 0, borderRadius: '0.45rem', cursor: 'pointer' }}>
               <AppsListDetail24Regular style={{ fontSize: 20, color: '#2ecc71', position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', clipPath: 'inset(0 0 50% 0)' }} />
               <AppsListDetail24Regular style={{ fontSize: 20, color: '#e74c3c', position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', clipPath: 'inset(50% 0 0 0)' }} />
@@ -335,6 +340,13 @@ export default function DetailPage({ financings, onUpdate }: Props) {
             <h3 className="section-heading riepilogo-title" style={{ textAlign: 'center', fontSize: '1.15rem', margin: 0, flex: 1 }}>RIEPILOGO</h3>
             <button onClick={() => navigate('/')} style={{ background: 'white', border: '1.5px solid #333', borderRadius: '0.5rem', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 39, height: 39, flexShrink: 0, boxSizing: 'border-box' }} title="Torna alla Home"><Home size={24} color="#333" /></button>
           </div>
+        </div>
+        <div className="sticky-bar" style={{ padding: 0, height: '1px' }} />
+      </div>
+      <div className="content" style={{ paddingTop: '0.5rem' }}>
+        {/* RIEPILOGO */}
+        <div className="card section-card" style={{ position: 'relative' }}>
+          <h3 className="section-heading" style={{ textAlign: 'center', marginBottom: '0.25rem' }}>Dati Finanziamento</h3>
           <div className="summary-grid">
             <div className="summary-column">
               {(financing.rateMode || 'variabile') === 'fissa' && (() => {
@@ -343,30 +355,46 @@ export default function DetailPage({ financings, onUpdate }: Props) {
                 const label = isComplete ? (netBal > 0.01 ? 'Concluso' : 'Concluso') : Math.abs(netBal) < 0.01 ? 'Pareggio di bilancio' : netBal > 0 ? 'Credito' : 'Debito';
                 const color = isComplete ? '#00c853' : Math.abs(netBal) < 0.01 ? '#1a7a42' : netBal > 0 ? '#1a5276' : '#7b241c';
                 return (
-                  <div className="summary-box" style={{ borderColor: color, color }}>
+                  <div className="summary-box" style={{ borderColor: color, color, position: 'relative', overflow: 'visible', cursor: 'pointer' }} onClick={() => setShowInterestTip(showInterestTip === 'situazione' ? null : 'situazione')}>
                     <span className="summary-label">SITUAZIONE</span>
                     <span className="summary-value" style={{ color }}>{label}</span>
                     {Math.abs(netBal) >= 0.01 && (
                       <span className="summary-value" style={{ color, fontSize: '0.65rem', fontWeight: 'normal' }}>({netBal > 0 ? 'Credito' : 'Debito'}: {netBal > 0 ? '+' : '-'}{Math.abs(netBal).toFixed(2)} €)</span>
                     )}
+                    <div className={`tip-bubble-right ${showInterestTip === 'situazione' ? 'tip-visible' : ''}`}>
+                      Stato attuale del finanziamento in base alle rate pagate e ai pagamenti effettuati
+                      <div className="tip-arrow-left" />
+                    </div>
                   </div>
                 );
               })()}
-              <div className="summary-box" style={{ borderColor: '#333', color: '#333' }}>
+              <div className="summary-box" style={{ borderColor: '#333', color: '#333', position: 'relative', overflow: 'visible', cursor: 'pointer' }} onClick={() => setShowInterestTip(showInterestTip === 'rimanenti' ? null : 'rimanenti')}>
                 <span className="summary-label">RATE RIMANENTI</span>
                 <span className="summary-value" style={{ color: '#333' }}>{Math.max(remainingMonths, 0)}</span>
+                <div className={`tip-bubble-right ${showInterestTip === 'rimanenti' ? 'tip-visible' : ''}`}>
+                  Formula: Rate totali − Rate pagate
+                  <div className="tip-arrow-left" />
+                </div>
               </div>
               {financing.interestPerRate != null && financing.interestPerRate > 0 && (
-                <div className="summary-box" style={{ borderColor: '#1a5276', color: '#1a5276' }}>
+                <div className="summary-box" style={{ borderColor: '#1a5276', color: '#1a5276', position: 'relative', overflow: 'visible', cursor: 'pointer' }} onClick={() => setShowInterestTip(showInterestTip === 'intxrata' ? null : 'intxrata')}>
                   <span className="summary-label">INTERESSI X RATA</span>
                   <span className="summary-value" style={{ color: '#1a5276' }}>{financing.interestPerRate.toFixed(2)} €</span>
+                  <div className={`tip-bubble-right ${showInterestTip === 'intxrata' ? 'tip-visible' : ''}`}>
+                    Formula: (Rata fissa × N° rate − Importo totale) ÷ N° rate
+                    <div className="tip-arrow-left" />
+                  </div>
                 </div>
               )}
               {isFixed ? (
                 <>
-                  <div className="summary-box" style={{ borderColor: '#c0392b', color: '#c0392b' }}>
+                  <div className="summary-box" style={{ borderColor: '#c0392b', color: '#c0392b', position: 'relative', overflow: 'visible', cursor: 'pointer' }} onClick={() => setShowInterestTip(showInterestTip === 'totdapagare' ? null : 'totdapagare')}>
                     <span className="summary-label">TOTALE DA PAGARE <br /><span style={{ color: '#3498db' }}>(SENZA INTERESSI)</span></span>
                     <span className="summary-value" style={{ color: '#c0392b' }}>{financing.totalAmount.toFixed(2)} €</span>
+                    <div className={`tip-bubble-right ${showInterestTip === 'totdapagare' ? 'tip-visible' : ''}`}>
+                      Importo totale del finanziamento senza gli interessi
+                      <div className="tip-arrow-left" />
+                    </div>
                   </div>
                   {(() => {
                     const totalRatesPaidCount = financing.payments.length + (financing.initialPaidRates || 0);
@@ -374,13 +402,21 @@ export default function DetailPage({ financings, onUpdate }: Props) {
                     const capitalPaid = paid - interestPaid;
                     return (
                       <>
-                        <div className="summary-box" style={{ borderColor: '#27ae60', color: '#27ae60' }}>
+                        <div className="summary-box" style={{ borderColor: '#27ae60', color: '#27ae60', position: 'relative', overflow: 'visible', cursor: 'pointer' }} onClick={() => setShowInterestTip(showInterestTip === 'pagatosi' ? null : 'pagatosi')}>
                           <span className="summary-label">PAGATO <br /><span style={{ color: '#3498db' }}>(SENZA INTERESSI)</span></span>
                           <span className="summary-value" style={{ color: '#27ae60' }}>{fmtEuro(capitalPaid > 0 ? capitalPaid : 0)}</span>
+                          <div className={`tip-bubble-right ${showInterestTip === 'pagatosi' ? 'tip-visible' : ''}`}>
+                            Formula: Totale versato − (Interessi x rata × Rate pagate)
+                            <div className="tip-arrow-left" />
+                          </div>
                         </div>
-                        <div className="summary-box" style={{ borderColor: '#d4a017', color: '#d4a017' }}>
+                        <div className="summary-box" style={{ borderColor: '#d4a017', color: '#d4a017', position: 'relative', overflow: 'visible', cursor: 'pointer' }} onClick={() => setShowInterestTip(showInterestTip === 'restantesi' ? null : 'restantesi')}>
                           <span className="summary-label">RESTANTE <br /><span style={{ color: '#3498db' }}>(SENZA INTERESSI)</span></span>
                           <span className="summary-value" style={{ color: '#d4a017' }}>{fmtEuro(Math.max(financing.totalAmount - (capitalPaid > 0 ? capitalPaid : 0), 0))}</span>
+                          <div className={`tip-bubble-right ${showInterestTip === 'restantesi' ? 'tip-visible' : ''}`}>
+                            Formula: Da pagare (senza interessi) − Pagato (senza interessi)
+                            <div className="tip-arrow-left" />
+                          </div>
                         </div>
                       </>
                     );
@@ -388,32 +424,52 @@ export default function DetailPage({ financings, onUpdate }: Props) {
                 </>
               ) : (
                 <>
-                  <div className="summary-box" style={{ borderColor: '#c0392b', color: '#c0392b' }}>
+                  <div className="summary-box" style={{ borderColor: '#c0392b', color: '#c0392b', position: 'relative', overflow: 'visible', cursor: 'pointer' }} onClick={() => setShowInterestTip(showInterestTip === 'dapagare' ? null : 'dapagare')}>
                     <span className="summary-label">DA PAGARE</span>
                     <span className="summary-value" style={{ color: '#c0392b' }}>{financing.totalAmount.toFixed(2)} €</span>
+                    <div className={`tip-bubble-right ${showInterestTip === 'dapagare' ? 'tip-visible' : ''}`}>
+                      Importo totale del finanziamento (senza interessi)
+                      <div className="tip-arrow-left" />
+                    </div>
                   </div>
-                  <div className="summary-box" style={{ borderColor: '#27ae60', color: '#27ae60' }}>
+                  <div className="summary-box" style={{ borderColor: '#27ae60', color: '#27ae60', position: 'relative', overflow: 'visible', cursor: 'pointer' }} onClick={() => setShowInterestTip(showInterestTip === 'pagato' ? null : 'pagato')}>
                     <span className="summary-label">PAGATO</span>
                     <span className="summary-value" style={{ color: '#27ae60' }}>{fmtEuro(paid > 0 ? paid : 0)}</span>
+                    <div className={`tip-bubble-right ${showInterestTip === 'pagato' ? 'tip-visible' : ''}`}>
+                      Somma di tutti i pagamenti effettuati (compresi eventuali interessi)
+                      <div className="tip-arrow-left" />
+                    </div>
                   </div>
-                  <div className="summary-box" style={{ borderColor: '#d4a017', color: '#d4a017' }}>
+                  <div className="summary-box" style={{ borderColor: '#d4a017', color: '#d4a017', position: 'relative', overflow: 'visible', cursor: 'pointer' }} onClick={() => setShowInterestTip(showInterestTip === 'restante' ? null : 'restante')}>
                     <span className="summary-label">RESTANTE</span>
                     <span className="summary-value" style={{ color: '#d4a017' }}>{fmtEuro(Math.max(financing.totalAmount - paid, 0))}</span>
+                    <div className={`tip-bubble-right ${showInterestTip === 'restante' ? 'tip-visible' : ''}`}>
+                      Formula: Da pagare − Pagato
+                      <div className="tip-arrow-left" />
+                    </div>
                   </div>
                 </>
               )}
             </div>
             <div className="summary-column">
               {(financing.rateMode || 'variabile') === 'fissa' && rateAmount > 0 && (
-                <div className="summary-box" style={{ borderColor: '#8e44ad', color: '#8e44ad' }}>
+                <div className="summary-box" style={{ borderColor: '#8e44ad', color: '#8e44ad', position: 'relative', overflow: 'visible', cursor: 'pointer' }} onClick={() => setShowInterestTip(showInterestTip === 'ratafissa' ? null : 'ratafissa')}>
                   <span className="summary-label">RATA FISSA</span>
                   <span className="summary-value" style={{ color: '#8e44ad' }}>{rateAmount.toFixed(2)} €</span>
+                  <div className={`tip-bubble ${showInterestTip === 'ratafissa' ? 'tip-visible' : ''}`}>
+                    Importo fisso di ogni singola rata (comprensivo di interessi)
+                    <div className="tip-arrow" />
+                  </div>
                 </div>
               )}
-              <div className="summary-box" style={{ borderColor: '#666', color: '#666' }}>
+              <div className="summary-box" style={{ borderColor: '#666', color: '#666', position: 'relative', overflow: 'visible', cursor: 'pointer' }} onClick={() => setShowInterestTip(showInterestTip === 'pagate' ? null : 'pagate')}>
                 <span className="summary-label">RATE PAGATE</span>
                 <span className="summary-value" style={{ color: '#666' }}>{ratesPaid}</span>
                 <span className="summary-sub">su {financing.totalMonths} rate totali</span>
+                <div className={`tip-bubble ${showInterestTip === 'pagate' ? 'tip-visible' : ''}`}>
+                  Numero di pagamenti effettuati nello storico
+                  <div className="tip-arrow" />
+                </div>
               </div>
               {!isFixed && (() => {
                 const avgRate = financing.payments.length > 0 ? paymentsPaid / financing.payments.length : 0;
@@ -421,17 +477,29 @@ export default function DetailPage({ financings, onUpdate }: Props) {
                 const avgInterest = financing.payments.length > 0 ? interessiPagati / financing.payments.length : 0;
                 return (
                   <>
-                    <div className="summary-box" style={{ borderColor: '#8e44ad', color: '#8e44ad' }}>
+                    <div className="summary-box" style={{ borderColor: '#8e44ad', color: '#8e44ad', position: 'relative', overflow: 'visible', cursor: 'pointer' }} onClick={() => setShowInterestTip(showInterestTip === 'media' ? null : 'media')}>
                       <span className="summary-label">RATA MEDIA</span>
                       <span className="summary-value" style={{ color: '#8e44ad' }}>{fmtEuro(avgRate)}</span>
+                      <div className={`tip-bubble ${showInterestTip === 'media' ? 'tip-visible' : ''}`}>
+                        {financing.payments.length > 0 ? 'Formula: Totale pagato ÷ Numero rate pagate' : <><span>Calcolato dopo almeno una rata pagata</span><br /><span style={{ opacity: 0.7 }}>Formula: Totale pagato ÷ Numero rate pagate</span></>}
+                        <div className="tip-arrow" />
+                      </div>
                     </div>
-                    <div className="summary-box" style={{ borderColor: '#3498db', color: '#3498db' }}>
+                    <div className="summary-box" style={{ borderColor: '#3498db', color: '#3498db', position: 'relative', overflow: 'visible', cursor: 'pointer' }} onClick={() => setShowInterestTip(showInterestTip === 'interessi' ? null : 'interessi')}>
                       <span className="summary-label">INTERESSI PAGATI</span>
-                      <span className="summary-value" style={{ color: '#3498db' }}>{fmtEuro(interessiPagati)}</span>
+                      <span className="summary-value" style={{ color: '#3498db' }}>{maxReached && interessiPagati > 0.004 ? interessiPagati.toFixed(2) + ' €' : '- €'}</span>
+                      <div className={`tip-bubble ${showInterestTip === 'interessi' ? 'tip-visible' : ''}`}>
+                        {maxReached ? 'Formula: Pagato − Da pagare' : <><span>Calcolati dopo il pagamento di tutte le rate</span><br /><span style={{ opacity: 0.7 }}>Formula: Pagato − Da pagare</span></>}
+                        <div className="tip-arrow" />
+                      </div>
                     </div>
-                    <div className="summary-box" style={{ borderColor: '#1a5276', color: '#1a5276' }}>
+                    <div className="summary-box" style={{ borderColor: '#1a5276', color: '#1a5276', position: 'relative', overflow: 'visible', cursor: 'pointer' }} onClick={() => setShowInterestTip(showInterestTip === 'medio' ? null : 'medio')}>
                       <span className="summary-label">INTERESSE MEDIO X RATA</span>
-                      <span className="summary-value" style={{ color: '#1a5276' }}>{fmtEuro(avgInterest)}</span>
+                      <span className="summary-value" style={{ color: '#1a5276' }}>{financing.payments.length > 0 && avgInterest > 0.004 ? avgInterest.toFixed(2) + ' €' : '- €'}</span>
+                      <div className={`tip-bubble ${showInterestTip === 'medio' ? 'tip-visible' : ''}`}>
+                        {financing.payments.length > 0 ? 'Formula: Interessi pagati ÷ Numero rate pagate' : <><span>Calcolato dopo almeno una rata pagata</span><br /><span style={{ opacity: 0.7 }}>Formula: Interessi pagati ÷ Numero rate pagate</span></>}
+                        <div className="tip-arrow" />
+                      </div>
                     </div>
                   </>
                 );
@@ -441,19 +509,31 @@ export default function DetailPage({ financings, onUpdate }: Props) {
                 if (!interestPerRate || interestPerRate < 0.01) return null;
                 return (
                   <>
-                    <div className="summary-box" style={{ borderColor: '#3498db', color: '#3498db' }}>
+                    <div className="summary-box" style={{ borderColor: '#3498db', color: '#3498db', position: 'relative', overflow: 'visible', cursor: 'pointer' }} onClick={() => setShowInterestTip(showInterestTip === 'intpagati_f' ? null : 'intpagati_f')}>
                       <span className="summary-label">INTERESSI PAGATI</span>
                       <span className="summary-value" style={{ color: '#3498db' }}>{fmtEuro(interestPerRate * (financing.payments.length + (financing.initialPaidRates || 0)))}</span>
+                      <div className={`tip-bubble ${showInterestTip === 'intpagati_f' ? 'tip-visible' : ''}`}>
+                        Formula: Interessi x rata × Rate pagate
+                        <div className="tip-arrow" />
+                      </div>
                     </div>
-                    <div className="summary-box" style={{ borderColor: '#e74c3c', color: '#e74c3c' }}>
+                    <div className="summary-box" style={{ borderColor: '#e74c3c', color: '#e74c3c', position: 'relative', overflow: 'visible', cursor: 'pointer' }} onClick={() => setShowInterestTip(showInterestTip === 'totdapagare_ci' ? null : 'totdapagare_ci')}>
                       <span className="summary-label">TOTALE DA PAGARE<br /><span style={{ color: '#3498db' }}>(CON INTERESSI)</span></span>
                       <span className="summary-value" style={{ color: '#e74c3c' }}>{(financing.totalAmount + interestPerRate * financing.totalMonths).toFixed(2)} €</span>
+                      <div className={`tip-bubble ${showInterestTip === 'totdapagare_ci' ? 'tip-visible' : ''}`}>
+                        Formula: Importo totale + (Interessi x rata × N° rate)
+                        <div className="tip-arrow" />
+                      </div>
                     </div>
-                    <div className="summary-box" style={{ borderColor: '#1abc9c', color: '#1abc9c' }}>
+                    <div className="summary-box" style={{ borderColor: '#1abc9c', color: '#1abc9c', position: 'relative', overflow: 'visible', cursor: 'pointer' }} onClick={() => setShowInterestTip(showInterestTip === 'totpagato_ci' ? null : 'totpagato_ci')}>
                       <span className="summary-label">TOTALE PAGATO<br /><span style={{ color: '#3498db' }}>(CON INTERESSI)</span></span>
                       <span className="summary-value" style={{ color: '#1abc9c' }}>{fmtEuro(paid > 0 ? paid : 0)}</span>
+                      <div className={`tip-bubble ${showInterestTip === 'totpagato_ci' ? 'tip-visible' : ''}`}>
+                        Somma di tutti i versamenti effettuati (capitale + interessi)
+                        <div className="tip-arrow" />
+                      </div>
                     </div>
-                    <div className="summary-box" style={{ borderColor: '#f1c40f', color: '#f1c40f' }}>
+                    <div className="summary-box" style={{ borderColor: '#f1c40f', color: '#f1c40f', position: 'relative', overflow: 'visible', cursor: 'pointer' }} onClick={() => setShowInterestTip(showInterestTip === 'restante_ci' ? null : 'restante_ci')}>
                       <span className="summary-label">RESTANTE<br /><span style={{ color: '#3498db' }}>(CON INTERESSI)</span></span>
                       <span className="summary-value" style={{ color: '#f1c40f' }}>{(() => {
                         const totalRatesPaidR = financing.payments.length + (financing.initialPaidRates || 0);
@@ -461,6 +541,10 @@ export default function DetailPage({ financings, onUpdate }: Props) {
                         const interestRemaining = interestPerRate * (financing.totalMonths - totalRatesPaidR);
                         return fmtEuro(Math.max(capitalRemaining + interestRemaining, 0));
                       })()}</span>
+                      <div className={`tip-bubble ${showInterestTip === 'restante_ci' ? 'tip-visible' : ''}`}>
+                        Formula: Da pagare (con interessi) − Pagato (con interessi)
+                        <div className="tip-arrow" />
+                      </div>
                     </div>
                   </>
                 );
@@ -1038,6 +1122,9 @@ export default function DetailPage({ financings, onUpdate }: Props) {
         document.body
       )}
     </div>
+    {showInterestTip && (
+      <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setShowInterestTip(null)} />
+    )}
     {toast && (
       <div className="toast" style={{ background: toast.color }}>{toast.msg}</div>
     )}

@@ -949,9 +949,7 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                             <div className="card-info card-info-green"><span>Pagato:</span><span>{paid > 0.004 ? paid.toFixed(2) + ' €' : '- €'}</span></div>
                             <hr className="card-separator" />
                             <div className="card-info card-info-yellow"><span>Restante:</span><span>{f.totalAmount - paid > 0.004 ? Math.max(f.totalAmount - paid, 0).toFixed(2) + ' €' : '- €'}</span></div>
-                            {maxReachedHP && paid > f.totalAmount && (
-                              <div className="card-info" style={{ color: '#3498db' }}><span>Interessi Pagati:</span><span>{(paid - f.totalAmount).toFixed(2)} €</span></div>
-                            )}
+                            <hr className="card-separator" />
                           </>
                         )}
                       </>
@@ -994,6 +992,22 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                       </div>
                       <div className="card-info-center" style={{ color: '#3498db' }}>
                         Interessi Totali Pagati: {interestPaidInt > 0.004 ? interestPaidInt.toFixed(2) + ' €' : '- €'}
+                      </div>
+                    </>
+                  );
+                })()}
+                {(f.rateMode || 'variabile') !== 'fissa' && (() => {
+                  const interessiVar = Math.max(paid - f.totalAmount, 0);
+                  const avgInterestVar = f.payments.length > 0 ? interessiVar / f.payments.length : 0;
+                  return (
+                    <>
+                      <hr className="card-separator" />
+                      <div className="card-info-center" style={{ background: 'linear-gradient(to right, #1a5276, #3498db)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', fontWeight: 'bold', fontSize: '0.75rem', letterSpacing: '1px', textTransform: 'uppercase' as const }}>INTERESSI</div>
+                      <div className="card-info-center" style={{ color: '#1a5276' }}>
+                        Interesse medio x rata: {maxReachedHP && avgInterestVar > 0.004 ? avgInterestVar.toFixed(2) + ' €' : '- €'}
+                      </div>
+                      <div className="card-info-center" style={{ color: '#3498db' }}>
+                        Interessi Totali Pagati: {maxReachedHP && interessiVar > 0.004 ? interessiVar.toFixed(2) + ' €' : '- €'}
                       </div>
                     </>
                   );
