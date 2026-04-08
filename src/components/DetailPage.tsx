@@ -472,16 +472,17 @@ export default function DetailPage({ financings, onUpdate }: Props) {
                 </div>
               </div>
               {!isFixed && (() => {
-                const avgRate = financing.payments.length > 0 ? paymentsPaid / financing.payments.length : 0;
+                const totalRatesPaidVar = financing.payments.length + (financing.initialPaidRates || 0);
+                const avgRate = totalRatesPaidVar > 0 ? paid / totalRatesPaidVar : 0;
                 const interessiPagati = Math.max(paid - financing.totalAmount, 0);
-                const avgInterest = financing.payments.length > 0 ? interessiPagati / financing.payments.length : 0;
+                const avgInterest = totalRatesPaidVar > 0 ? interessiPagati / totalRatesPaidVar : 0;
                 return (
                   <>
                     <div className="summary-box" style={{ borderColor: '#8e44ad', color: '#8e44ad', position: 'relative', overflow: 'visible', cursor: 'pointer' }} onClick={() => setShowInterestTip(showInterestTip === 'media' ? null : 'media')}>
                       <span className="summary-label">RATA MEDIA</span>
                       <span className="summary-value" style={{ color: '#8e44ad' }}>{fmtEuro(avgRate)}</span>
                       <div className={`tip-bubble ${showInterestTip === 'media' ? 'tip-visible' : ''}`}>
-                        {financing.payments.length > 0 ? 'Formula: Totale pagato ÷ Numero rate pagate' : <><span>Calcolato dopo almeno una rata pagata</span><br /><span style={{ opacity: 0.7 }}>Formula: Totale pagato ÷ Numero rate pagate</span></>}
+                        {totalRatesPaidVar > 0 ? 'Formula: Totale pagato ÷ Numero rate pagate' : <><span>Calcolato dopo almeno una rata pagata</span><br /><span style={{ opacity: 0.7 }}>Formula: Totale pagato ÷ Numero rate pagate</span></>}
                         <div className="tip-arrow" />
                       </div>
                     </div>
@@ -495,9 +496,9 @@ export default function DetailPage({ financings, onUpdate }: Props) {
                     </div>
                     <div className="summary-box" style={{ borderColor: '#1a5276', color: '#1a5276', position: 'relative', overflow: 'visible', cursor: 'pointer' }} onClick={() => setShowInterestTip(showInterestTip === 'medio' ? null : 'medio')}>
                       <span className="summary-label">INTERESSE MEDIO X RATA</span>
-                      <span className="summary-value" style={{ color: '#1a5276' }}>{financing.payments.length > 0 && avgInterest > 0.004 ? avgInterest.toFixed(2) + ' €' : '- €'}</span>
+                      <span className="summary-value" style={{ color: '#1a5276' }}>{totalRatesPaidVar > 0 && avgInterest > 0.004 ? avgInterest.toFixed(2) + ' €' : '- €'}</span>
                       <div className={`tip-bubble ${showInterestTip === 'medio' ? 'tip-visible' : ''}`}>
-                        {financing.payments.length > 0 ? 'Formula: Interessi pagati ÷ Numero rate pagate' : <><span>Calcolato dopo almeno una rata pagata</span><br /><span style={{ opacity: 0.7 }}>Formula: Interessi pagati ÷ Numero rate pagate</span></>}
+                        {totalRatesPaidVar > 0 ? <><span>Calcolati dopo il pagamento di tutte le rate</span><br /><span style={{ opacity: 0.7 }}>Formula: Interessi pagati ÷ Numero rate pagate</span></> : <><span>Calcolato dopo almeno una rata pagata</span><br /><span style={{ opacity: 0.7 }}>Formula: Interessi pagati ÷ Numero rate pagate</span></>}
                         <div className="tip-arrow" />
                       </div>
                     </div>

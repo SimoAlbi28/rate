@@ -658,7 +658,7 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                 style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', width: 50, height: 42, padding: 0, boxSizing: 'border-box' }}
                 title="Ordinamento"
               >
-                {sortMode === 'default' && <span style={{ fontSize: '0.7rem', fontWeight: 'bold' }}>A-Z</span>}
+                {sortMode === 'default' && <span style={{ fontSize: '0.7rem', fontWeight: 'bold', whiteSpace: 'nowrap' }}>A-Z</span>}
                 {sortMode === 'progress-desc' && <img src="/green-line.jpg" alt="" style={{ width: 22, height: 'auto' }} />}
                 {sortMode === 'progress-asc' && <img src="/red-line.jpg" alt="" style={{ width: 22, height: 'auto' }} />}
               </button>
@@ -997,17 +997,18 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                   );
                 })()}
                 {(f.rateMode || 'variabile') !== 'fissa' && (() => {
+                  const totalRatesVar = f.payments.length + (f.initialPaidRates || 0);
                   const interessiVar = Math.max(paid - f.totalAmount, 0);
-                  const avgInterestVar = f.payments.length > 0 ? interessiVar / f.payments.length : 0;
+                  const avgInterestVar = totalRatesVar > 0 ? interessiVar / totalRatesVar : 0;
                   return (
                     <>
                       <hr className="card-separator" />
                       <div className="card-info-center" style={{ background: 'linear-gradient(to right, #1a5276, #3498db)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', fontWeight: 'bold', fontSize: '0.75rem', letterSpacing: '1px', textTransform: 'uppercase' as const }}>INTERESSI</div>
                       <div className="card-info-center" style={{ color: '#1a5276' }}>
-                        Interesse medio x rata: {maxReachedHP && avgInterestVar > 0.004 ? avgInterestVar.toFixed(2) + ' €' : '- €'}
+                        Interesse medio x rata: {totalRatesVar > 0 && avgInterestVar > 0.004 ? avgInterestVar.toFixed(2) + ' €' : '- €'}
                       </div>
                       <div className="card-info-center" style={{ color: '#3498db' }}>
-                        Interessi Totali Pagati: {maxReachedHP && interessiVar > 0.004 ? interessiVar.toFixed(2) + ' €' : '- €'}
+                        Interessi Totali Pagati: {totalRatesVar > 0 && interessiVar > 0.004 ? interessiVar.toFixed(2) + ' €' : '- €'}
                       </div>
                     </>
                   );
