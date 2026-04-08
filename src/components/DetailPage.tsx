@@ -97,27 +97,58 @@ export default function DetailPage({ financings, onUpdate }: Props) {
     return '#2ecc71';
   };
 
-  const fmtEuro = (v: number) => v <= 0.004 ? '-' : `${v.toFixed(2)} €`;
+  const fmtEuro = (v: number) => v <= 0.004 ? '- €' : `${v.toFixed(2)} €`;
 
   const paymentsPaid = financing.payments.reduce((s, p) => s + p.amount, 0);
   const paid = paymentsPaid + (financing.initialPaid || 0);
   const rateAmount = financing.fixedRateAmount || (financing.totalMonths > 0 ? financing.totalAmount / financing.totalMonths : 0);
   const isFixed = (financing.rateMode || 'variabile') === 'fissa' && rateAmount > 0;
 
-  // Ogni pagamento = 1 rata, indipendentemente dall'importo
-  const countEffectiveRates = (_p: Payment) => 1;
+  // Per rata fissa: un pagamento multiplo della rata conta come N rate. Per variabile: ogni pagamento = 1 rata.
+  const countEffectiveRates = (p: Payment) => {
+    if (!isFixed || rateAmount <= 0) return 1;
+    const ratio = p.amount / rateAmount;
+    const rounded = Math.round(ratio);
+    if (rounded >= 1 && Math.abs(p.amount - rounded * rateAmount) < 0.01) return rounded;
+    return 1;
+  };
 
-  const effectiveRatesFromPayments = financing.payments.length;
-  const excessCredit = 0;
-  const cappedPayments: { payment: Payment, ratesUsed: number, accDebt: number }[] = [];
+  const maxRatesFromPayments = financing.totalMonths - (financing.initialPaidRates || 0);
+  const { effectiveRates: effectiveRatesFromPayments, excessCredit, cappedPayments } = (() => {
+    if (!isFixed || rateAmount <= 0) return { effectiveRates: financing.payments.length, excessCredit: 0, cappedPayments: [] as { payment: Payment, ratesUsed: number, accDebt: number }[] };
+    let cumulative = 0;
+    let credit = 0;
+    let runningDebt = 0;
+    const capped: { payment: Payment, ratesUsed: number, accDebt: number }[] = [];
+    for (const p of financing.payments) {
+      const ratio = p.amount / rateAmount;
+      const rounded = Math.round(ratio);
+      const isMultiple = rounded >= 1 && Math.abs(p.amount - rounded * rateAmount) < 0.01;
+      if (isMultiple) {
+        const canAdd = Math.max(maxRatesFromPayments - cumulative, 0);
+        const actual = Math.min(rounded, canAdd);
+        cumulative += actual;
+        if (rounded > actual) {
+          credit += (rounded - actual) * rateAmount;
+          capped.push({ payment: p, ratesUsed: actual, accDebt: runningDebt });
+        }
+      } else {
+        cumulative += 1;
+        const diff = rateAmount - p.amount;
+        if (diff > 0.01) runningDebt += diff;
+      }
+    }
+    return { effectiveRates: cumulative, excessCredit: credit, cappedPayments: capped };
+  })();
   const totalPaymentsCount = effectiveRatesFromPayments + (financing.initialPaidRates || 0);
   const maxReached = financing.totalMonths > 0 && totalPaymentsCount >= financing.totalMonths;
 
   const ratesPaid = totalPaymentsCount;
   const remainingMonths = financing.totalMonths - ratesPaid;
-  const progressInterestPaid = financing.interestPerRate ? financing.interestPerRate * totalPaymentsCount : 0;
+  // Per rata fissa: sottrai interessi dal progresso. Per variabile: progresso diretto su pagato/totale
+  const progressInterestPaid = isFixed && financing.interestPerRate ? financing.interestPerRate * totalPaymentsCount : 0;
   const progressCapitalOnly = Math.max(paid - progressInterestPaid, 0);
-  const progress = financing.totalAmount > 0 ? (progressCapitalOnly / financing.totalAmount) * 100 : 0;
+  const progress = financing.totalAmount > 0 ? (Math.min(progressCapitalOnly, financing.totalAmount) / financing.totalAmount) * 100 : 0;
 
   const fixedInt = isFixed ? Math.floor(rateAmount).toString() : '';
   const fixedDec = isFixed ? (Math.round((rateAmount - Math.floor(rateAmount)) * 100) || 0).toString() : '';
@@ -331,27 +362,46 @@ export default function DetailPage({ financings, onUpdate }: Props) {
                   <span className="summary-value" style={{ color: '#1a5276' }}>{financing.interestPerRate.toFixed(2)} €</span>
                 </div>
               )}
-              <div className="summary-box" style={{ borderColor: '#c0392b', color: '#c0392b' }}>
-                <span className="summary-label">TOTALE DA PAGARE <br /><span style={{ color: '#3498db' }}>(SENZA INTERESSI)</span></span>
-                <span className="summary-value" style={{ color: '#c0392b' }}>{financing.totalAmount.toFixed(2)} €</span>
-              </div>
-              {(() => {
-                const totalRatesPaidCount = financing.payments.length + (financing.initialPaidRates || 0);
-                const interestPaid = financing.interestPerRate ? financing.interestPerRate * totalRatesPaidCount : 0;
-                const capitalPaid = paid - interestPaid;
-                return (
-                  <>
-                    <div className="summary-box" style={{ borderColor: '#27ae60', color: '#27ae60' }}>
-                      <span className="summary-label">PAGATO <br /><span style={{ color: '#3498db' }}>(SENZA INTERESSI)</span></span>
-                      <span className="summary-value" style={{ color: '#27ae60' }}>{fmtEuro(capitalPaid > 0 ? capitalPaid : 0)}</span>
-                    </div>
-                    <div className="summary-box" style={{ borderColor: '#d4a017', color: '#d4a017' }}>
-                      <span className="summary-label">RESTANTE <br /><span style={{ color: '#3498db' }}>(SENZA INTERESSI)</span></span>
-                      <span className="summary-value" style={{ color: '#d4a017' }}>{fmtEuro(Math.max(financing.totalAmount - (capitalPaid > 0 ? capitalPaid : 0), 0))}</span>
-                    </div>
-                  </>
-                );
-              })()}
+              {isFixed ? (
+                <>
+                  <div className="summary-box" style={{ borderColor: '#c0392b', color: '#c0392b' }}>
+                    <span className="summary-label">TOTALE DA PAGARE <br /><span style={{ color: '#3498db' }}>(SENZA INTERESSI)</span></span>
+                    <span className="summary-value" style={{ color: '#c0392b' }}>{financing.totalAmount.toFixed(2)} €</span>
+                  </div>
+                  {(() => {
+                    const totalRatesPaidCount = financing.payments.length + (financing.initialPaidRates || 0);
+                    const interestPaid = financing.interestPerRate ? financing.interestPerRate * totalRatesPaidCount : 0;
+                    const capitalPaid = paid - interestPaid;
+                    return (
+                      <>
+                        <div className="summary-box" style={{ borderColor: '#27ae60', color: '#27ae60' }}>
+                          <span className="summary-label">PAGATO <br /><span style={{ color: '#3498db' }}>(SENZA INTERESSI)</span></span>
+                          <span className="summary-value" style={{ color: '#27ae60' }}>{fmtEuro(capitalPaid > 0 ? capitalPaid : 0)}</span>
+                        </div>
+                        <div className="summary-box" style={{ borderColor: '#d4a017', color: '#d4a017' }}>
+                          <span className="summary-label">RESTANTE <br /><span style={{ color: '#3498db' }}>(SENZA INTERESSI)</span></span>
+                          <span className="summary-value" style={{ color: '#d4a017' }}>{fmtEuro(Math.max(financing.totalAmount - (capitalPaid > 0 ? capitalPaid : 0), 0))}</span>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </>
+              ) : (
+                <>
+                  <div className="summary-box" style={{ borderColor: '#c0392b', color: '#c0392b' }}>
+                    <span className="summary-label">DA PAGARE</span>
+                    <span className="summary-value" style={{ color: '#c0392b' }}>{financing.totalAmount.toFixed(2)} €</span>
+                  </div>
+                  <div className="summary-box" style={{ borderColor: '#27ae60', color: '#27ae60' }}>
+                    <span className="summary-label">PAGATO</span>
+                    <span className="summary-value" style={{ color: '#27ae60' }}>{fmtEuro(paid > 0 ? paid : 0)}</span>
+                  </div>
+                  <div className="summary-box" style={{ borderColor: '#d4a017', color: '#d4a017' }}>
+                    <span className="summary-label">RESTANTE</span>
+                    <span className="summary-value" style={{ color: '#d4a017' }}>{fmtEuro(Math.max(financing.totalAmount - paid, 0))}</span>
+                  </div>
+                </>
+              )}
             </div>
             <div className="summary-column">
               {(financing.rateMode || 'variabile') === 'fissa' && rateAmount > 0 && (
@@ -365,6 +415,27 @@ export default function DetailPage({ financings, onUpdate }: Props) {
                 <span className="summary-value" style={{ color: '#666' }}>{ratesPaid}</span>
                 <span className="summary-sub">su {financing.totalMonths} rate totali</span>
               </div>
+              {!isFixed && (() => {
+                const avgRate = financing.payments.length > 0 ? paymentsPaid / financing.payments.length : 0;
+                const interessiPagati = Math.max(paid - financing.totalAmount, 0);
+                const avgInterest = financing.payments.length > 0 ? interessiPagati / financing.payments.length : 0;
+                return (
+                  <>
+                    <div className="summary-box" style={{ borderColor: '#8e44ad', color: '#8e44ad' }}>
+                      <span className="summary-label">RATA MEDIA</span>
+                      <span className="summary-value" style={{ color: '#8e44ad' }}>{fmtEuro(avgRate)}</span>
+                    </div>
+                    <div className="summary-box" style={{ borderColor: '#3498db', color: '#3498db' }}>
+                      <span className="summary-label">INTERESSI PAGATI</span>
+                      <span className="summary-value" style={{ color: '#3498db' }}>{fmtEuro(interessiPagati)}</span>
+                    </div>
+                    <div className="summary-box" style={{ borderColor: '#1a5276', color: '#1a5276' }}>
+                      <span className="summary-label">INTERESSE MEDIO X RATA</span>
+                      <span className="summary-value" style={{ color: '#1a5276' }}>{fmtEuro(avgInterest)}</span>
+                    </div>
+                  </>
+                );
+              })()}
               {isFixed && (() => {
                 const interestPerRate = financing.interestPerRate ?? (financing.fixedRateAmount && financing.totalMonths > 0 ? (financing.fixedRateAmount * financing.totalMonths - financing.totalAmount) / financing.totalMonths : 0);
                 if (!interestPerRate || interestPerRate < 0.01) return null;
@@ -372,7 +443,7 @@ export default function DetailPage({ financings, onUpdate }: Props) {
                   <>
                     <div className="summary-box" style={{ borderColor: '#3498db', color: '#3498db' }}>
                       <span className="summary-label">INTERESSI PAGATI</span>
-                      <span className="summary-value" style={{ color: '#3498db' }}>{(interestPerRate * (financing.payments.length + (financing.initialPaidRates || 0))).toFixed(2)} €</span>
+                      <span className="summary-value" style={{ color: '#3498db' }}>{fmtEuro(interestPerRate * (financing.payments.length + (financing.initialPaidRates || 0)))}</span>
                     </div>
                     <div className="summary-box" style={{ borderColor: '#e74c3c', color: '#e74c3c' }}>
                       <span className="summary-label">TOTALE DA PAGARE<br /><span style={{ color: '#3498db' }}>(CON INTERESSI)</span></span>
@@ -401,9 +472,9 @@ export default function DetailPage({ financings, onUpdate }: Props) {
             <span className="progress-percent">{progress.toFixed(1)}%</span>
           </div>
           {(() => {
-            const interestPaidProg = financing.interestPerRate ? financing.interestPerRate * totalPaymentsCount : 0;
+            const interestPaidProg = isFixed && financing.interestPerRate ? financing.interestPerRate * totalPaymentsCount : 0;
             const capitalPaidProg = paid - interestPaidProg;
-            const progressCapital = financing.totalAmount > 0 ? (Math.max(capitalPaidProg, 0) / financing.totalAmount) * 100 : 0;
+            const progressCapital = financing.totalAmount > 0 ? (Math.min(Math.max(capitalPaidProg, 0), financing.totalAmount) / financing.totalAmount) * 100 : 0;
             const totalRates = financing.totalMonths || 0;
             return (
               <div className="progress-bar big progress-bar-ticks">

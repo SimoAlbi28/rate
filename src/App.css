@@ -579,7 +579,6 @@ select {
   position: relative;
   margin-bottom: 0;
   padding-bottom: 1rem;
-  border-bottom: 1px dashed rgba(0, 0, 0, 0.1);
 }
 
 @media (min-width: 400px) {
@@ -592,7 +591,7 @@ select {
   background: white;
   border-radius: 1rem;
   padding: 1rem;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.08);
   transition: transform 0.15s, box-shadow 0.15s;
 }
 
@@ -600,6 +599,7 @@ select {
   cursor: pointer;
   position: relative;
   border: none;
+  box-shadow: none;
 }
 
 .financing-card::before {
@@ -607,8 +607,8 @@ select {
   position: absolute;
   inset: -1px;
   border-radius: 1rem;
-  padding: 1px;
-  background: conic-gradient(from var(--border-angle), #333 0deg, #333 250deg, #fff 290deg, #fff 320deg, #333 360deg);
+  padding: 2px;
+  background: conic-gradient(from var(--border-angle), #333 0deg, #333 250deg, rgba(200,200,200,0.3) 290deg, rgba(200,200,200,0.3) 320deg, #333 360deg);
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
@@ -632,12 +632,12 @@ select {
 
 .financing-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+  box-shadow: none;
 }
 
 .financing-card:active {
   transform: none;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  box-shadow: none;
 }
 
 .card-actions {

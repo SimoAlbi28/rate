@@ -796,8 +796,21 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
           {filteredFinancings.map((f) => {
             const paid = f.payments.reduce((s, p) => s + p.amount, 0) + (f.initialPaid || 0);
             const rateAmount = f.fixedRateAmount || (f.totalMonths > 0 ? f.totalAmount / f.totalMonths : 0);
-            // Ogni pagamento = 1 rata
-            const totalRatesHP = f.payments.length + (f.initialPaidRates || 0);
+            // Per fissa: multipli della rata contano N rate. Per variabile: ogni pagamento = 1 rata.
+            const isFixedMode = (f.rateMode || 'variabile') === 'fissa' && rateAmount > 0;
+            const maxRatesHP = f.totalMonths - (f.initialPaidRates || 0);
+            const effectiveRatesHP = (() => {
+              if (!isFixedMode || rateAmount <= 0) return f.payments.length;
+              let cum = 0;
+              for (const p of f.payments) {
+                const ratio = p.amount / rateAmount;
+                const rounded = Math.round(ratio);
+                const isMult = rounded >= 1 && Math.abs(p.amount - rounded * rateAmount) < 0.01;
+                if (isMult) { cum += Math.min(rounded, Math.max(maxRatesHP - cum, 0)); } else { cum += 1; }
+              }
+              return cum;
+            })();
+            const totalRatesHP = effectiveRatesHP + (f.initialPaidRates || 0);
             const ratesPaid = totalRatesHP;
             const remainingMonths = f.totalMonths - ratesPaid;
             const maxReachedHP = f.totalMonths > 0 && totalRatesHP >= f.totalMonths;
@@ -825,7 +838,7 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                   });
                 }}
               >
-                <div className="card-top-row">
+                <div className="card-top-row" style={{ background: (f.rateMode || 'variabile') === 'fissa' ? '#f3e8ff' : '#ffe8f0', borderRadius: '0.75rem', margin: '-1rem -1rem 0', padding: '0.75rem 1rem' }}>
                   <div className="card-emoji">{f.emoji}</div>
                   <div className="card-name">{f.name.charAt(0).toUpperCase() + f.name.slice(1)}</div>
                   <div className="card-actions">
@@ -855,6 +868,10 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                       style={maxReachedHP ? { opacity: 0.4, pointerEvents: 'none' } : {}}
                       onClick={(e) => {
                         e.stopPropagation();
+                        if (quickPayId === f.id) {
+                          setQuickPayId(null);
+                          return;
+                        }
                         if ((f.rateMode || 'variabile') === 'fissa' && rateAmount > 0) {
                           const intPart = Math.floor(rateAmount).toString();
                           const decPart = Math.round((rateAmount - Math.floor(rateAmount)) * 100);
@@ -907,34 +924,34 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                           <>
                             <div className="card-info-center" style={{ color: '#3498db', fontWeight: 'bold', textTransform: 'uppercase' as const }}>Senza interessi</div>
                             <div className="card-info card-info-red"><span>Totale da pagare:</span><span>{f.totalAmount.toFixed(2)} €</span></div>
-                            <div className="card-info card-info-green"><span>Totale Pagato:</span><span>{capitalPaid > 0 ? capitalPaid.toFixed(2) : '0.00'} €</span></div>
+                            <div className="card-info card-info-green"><span>Totale Pagato:</span><span>{capitalPaid > 0.004 ? capitalPaid.toFixed(2) + ' €' : '- €'}</span></div>
                             <hr className="card-separator" />
                             <div className="card-info card-info-yellow"><span>Restante:</span><span>{(() => {
                               const r = f.totalAmount - (capitalPaid > 0 ? capitalPaid : 0);
-                              return r > 0 ? r.toFixed(2) : '0.00';
-                            })()} €</span></div>
+                              return r > 0.004 ? r.toFixed(2) + ' €' : '- €';
+                            })()}</span></div>
                             <hr style={{ border: 'none', borderTop: '1px solid #000', margin: '6px 0', opacity: 0.3 }} />
                             <div className="card-info-center" style={{ color: '#3498db', fontWeight: 'bold', textTransform: 'uppercase' as const }}>Con interessi</div>
                             <div className="card-info" style={{ color: '#e74c3c' }}><span>Totale da pagare:</span><span>{(f.totalAmount + f.interestPerRate * f.totalMonths).toFixed(2)} €</span></div>
-                            <div className="card-info" style={{ color: '#1abc9c' }}><span>Totale Pagato:</span><span>{paid > 0 ? paid.toFixed(2) : '0.00'} €</span></div>
+                            <div className="card-info" style={{ color: '#1abc9c' }}><span>Totale Pagato:</span><span>{paid > 0.004 ? paid.toFixed(2) + ' €' : '- €'}</span></div>
                             <hr className="card-separator" />
                             <div className="card-info" style={{ color: '#f1c40f' }}><span>Restante:</span><span>{(() => {
                               const capitalRemaining = f.totalAmount - (capitalPaid > 0 ? capitalPaid : 0);
                               const interestRemaining = f.interestPerRate ? f.interestPerRate * (f.totalMonths - totalRatesPaid) : 0;
                               const restante = capitalRemaining + interestRemaining;
-                              return restante > 0 ? restante.toFixed(2) : '0.00';
-                            })()} €</span></div>
+                              return restante > 0.004 ? restante.toFixed(2) + ' €' : '- €';
+                            })()}</span></div>
                             <hr style={{ border: 'none', borderTop: '1px solid #000', margin: '6px 0', opacity: 0.3 }} />
                           </>
                         ) : (
                           <>
                             <div className="card-info card-info-red"><span>Da pagare:</span><span>{f.totalAmount.toFixed(2)} €</span></div>
-                            <div className="card-info card-info-green"><span>Pagato:</span><span>{capitalPaid > 0 ? capitalPaid.toFixed(2) : '0.00'} €</span></div>
-                            {f.interestPerRate != null && f.interestPerRate > 0 && (
-                              <div className="card-info" style={{ color: '#3498db' }}><span>Interessi pagati:</span><span>{interestPaid.toFixed(2)} €</span></div>
-                            )}
+                            <div className="card-info card-info-green"><span>Pagato:</span><span>{paid > 0.004 ? paid.toFixed(2) + ' €' : '- €'}</span></div>
                             <hr className="card-separator" />
-                            <div className="card-info card-info-yellow"><span>Restante:</span><span>{residuo > 0 ? residuo.toFixed(2) : '0.00'} €</span></div>
+                            <div className="card-info card-info-yellow"><span>Restante:</span><span>{f.totalAmount - paid > 0.004 ? Math.max(f.totalAmount - paid, 0).toFixed(2) + ' €' : '- €'}</span></div>
+                            {maxReachedHP && paid > f.totalAmount && (
+                              <div className="card-info" style={{ color: '#3498db' }}><span>Interessi Pagati:</span><span>{(paid - f.totalAmount).toFixed(2)} €</span></div>
+                            )}
                           </>
                         )}
                       </>
@@ -943,10 +960,11 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                 </div>
                 <div className="card-info-center" style={{ color: '#333', fontWeight: 'bold', fontSize: '0.75rem', letterSpacing: '1px' }}>AVANZAMENTO</div>
                 {(() => {
+                  const isFixedProg = (f.rateMode || 'variabile') === 'fissa';
                   const totalRatesPaidProg = f.payments.length + (f.initialPaidRates || 0);
-                  const interestPaidProg = f.interestPerRate ? f.interestPerRate * totalRatesPaidProg : 0;
+                  const interestPaidProg = isFixedProg && f.interestPerRate ? f.interestPerRate * totalRatesPaidProg : 0;
                   const capitalPaidProg = paid - interestPaidProg;
-                  const progressCapital = f.totalAmount > 0 ? (Math.max(capitalPaidProg, 0) / f.totalAmount) * 100 : 0;
+                  const progressCapital = f.totalAmount > 0 ? (Math.min(Math.max(capitalPaidProg, 0), f.totalAmount) / f.totalAmount) * 100 : 0;
                   const totalRates = f.totalMonths || 0;
                   return (
                     <div className="progress-bar progress-bar-ticks">
@@ -964,7 +982,7 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                     </div>
                   );
                 })()}
-                <hr className="card-separator" />
+                {(f.rateMode || 'variabile') === 'fissa' && f.interestPerRate != null && f.interestPerRate > 0 && (<hr className="card-separator" />)}
                 {(f.rateMode || 'variabile') === 'fissa' && f.interestPerRate != null && f.interestPerRate > 0 && (() => {
                   const totalRatesPaidInt = f.payments.length + (f.initialPaidRates || 0);
                   const interestPaidInt = f.interestPerRate * totalRatesPaidInt;
@@ -975,17 +993,18 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                         Interesse x rata: {f.interestPerRate!.toFixed(2)} €
                       </div>
                       <div className="card-info-center" style={{ color: '#3498db' }}>
-                        Interessi Totali Pagati: {interestPaidInt.toFixed(2)} €
+                        Interessi Totali Pagati: {interestPaidInt > 0.004 ? interestPaidInt.toFixed(2) + ' €' : '- €'}
                       </div>
                     </>
                   );
                 })()}
                 </>)}
                 {!expandedCards.has(f.id) && (() => {
+                  const isFixedProg2 = (f.rateMode || 'variabile') === 'fissa';
                   const totalRatesPaidProg = f.payments.length + (f.initialPaidRates || 0);
-                  const interestPaidProg = f.interestPerRate ? f.interestPerRate * totalRatesPaidProg : 0;
+                  const interestPaidProg = isFixedProg2 && f.interestPerRate ? f.interestPerRate * totalRatesPaidProg : 0;
                   const capitalPaidProg = paid - interestPaidProg;
-                  const progressCapital = f.totalAmount > 0 ? (Math.max(capitalPaidProg, 0) / f.totalAmount) * 100 : 0;
+                  const progressCapital = f.totalAmount > 0 ? (Math.min(Math.max(capitalPaidProg, 0), f.totalAmount) / f.totalAmount) * 100 : 0;
                   const totalRates = f.totalMonths || 0;
                   return (
                     <>
