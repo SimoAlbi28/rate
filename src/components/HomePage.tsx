@@ -1,9 +1,8 @@
 import { useState, useRef, useCallback, useEffect, useLayoutEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, X, LogOut, Home } from 'lucide-react';
+import { Plus, Search, X } from 'lucide-react';
 import { AppsListDetail24Regular } from '@fluentui/react-icons';
 import type { Financing, RateType, Payment } from '../types';
-import { useAuth } from '../AuthContext';
 
 interface Props {
   financings: Financing[];
@@ -45,7 +44,6 @@ const PROFILE_COLORS = [
 
 export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Props) {
   const navigate = useNavigate();
-  const { signOut, user, isGuest } = useAuth();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [showAllEmojis, setShowAllEmojis] = useState(false);
@@ -58,8 +56,8 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
   const [showProfile, setShowProfile] = useState(false);
   const [profileIcon, setProfileIcon] = useState(() => localStorage.getItem('profileIcon') || '👤');
   const [profileColor, setProfileColor] = useState(() => localStorage.getItem('profileColor') || '#3498db');
-  const [tempProfileIcon, setTempProfileIcon] = useState('');
-  const [tempProfileColor, setTempProfileColor] = useState('');
+  const [tempProfileIcon] = useState('');
+  const [tempProfileColor] = useState('');
   const [showAllProfileIcons, setShowAllProfileIcons] = useState(false);
   const [errors, setErrors] = useState<Set<string>>(new Set());
   const nameRef = useRef<HTMLInputElement>(null);
@@ -827,7 +825,6 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
             const remainingMonths = f.totalMonths - ratesPaid;
             const maxReachedHP = f.totalMonths > 0 && totalRatesHP >= f.totalMonths;
 
-            const residuo = f.totalAmount - paid;
             const formatPeriod = () => {
               if (f.startDate && f.endDate) {
                 const s = new Date(f.startDate).toLocaleDateString('it-IT', { month: 'short', year: 'numeric' });

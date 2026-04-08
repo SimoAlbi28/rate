@@ -65,7 +65,6 @@ export default function RiepilogoPage({ financings }: Props) {
 
   // Pagato totale con interessi (solo fisse)
   const totaleDaPagareConInteressi = totaleDaPagare + totaleInteressiTotali;
-  const totaleRestaConInteressi = Math.max(totaleDaPagareConInteressi - totalePagato, 0);
 
   // Media
   const rataMedieGlobale = totalRatePagate > 0 ? totalePagato / totalRatePagate : 0;

@@ -19,7 +19,7 @@ export default function BottomNav({ profileIcon, profileColor }: Props) {
   };
 
   const [activeTab, setActiveTab] = useState<'riepilogo' | 'home' | 'profilo' | null>(() => getTab(location.pathname));
-  const [prevTab, setPrevTab] = useState<'riepilogo' | 'home' | 'profilo' | null>(activeTab);
+  const [, setPrevTab] = useState<'riepilogo' | 'home' | 'profilo' | null>(activeTab);
   const [skipTransition, setSkipTransition] = useState(false);
 
   useEffect(() => {
@@ -50,7 +50,7 @@ export default function BottomNav({ profileIcon, profileColor }: Props) {
         left: getLeft(activeTab),
         opacity: activeTab ? 1 : 0,
         transform: activeTab ? 'scaleY(1)' : 'scaleY(0)',
-        transition: skipTransition ? 'opacity 0.3s ease, transform 0.3s ease' : undefined,
+        transition: skipTransition ? 'none' : 'opacity 0.3s ease, transform 0.3s ease',
       }} />
       <button
         className={`bottom-nav-btn ${activeTab === 'riepilogo' ? 'active' : ''}`}

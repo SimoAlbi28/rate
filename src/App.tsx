@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import type { Financing, RateType } from './types';
-import { loadFinancings, saveFinancings, loadFinancingsFromCloud, saveFinancingsToCloud, mergeLocalToCloud } from './storage';
+import { loadFinancings, saveFinancings, saveFinancingsToCloud, mergeLocalToCloud } from './storage';
 import { AuthProvider, useAuth } from './AuthContext';
 import HomePage from './components/HomePage';
 import DetailPage from './components/DetailPage';
@@ -12,7 +12,7 @@ import ProfilePage from './components/ProfilePage';
 import './App.css';
 
 function AppContent() {
-  const { user, loading, isGuest, signOut } = useAuth();
+  const { user, loading, isGuest } = useAuth();
   const [financings, setFinancings] = useState<Financing[]>([]);
   const [dataLoaded, setDataLoaded] = useState(false);
   const [redirectToProfile, setRedirectToProfile] = useState(false);
