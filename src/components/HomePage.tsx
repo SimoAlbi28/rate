@@ -796,23 +796,10 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
           {filteredFinancings.map((f) => {
             const paid = f.payments.reduce((s, p) => s + p.amount, 0) + (f.initialPaid || 0);
             const rateAmount = f.fixedRateAmount || (f.totalMonths > 0 ? f.totalAmount / f.totalMonths : 0);
-            const ratesPaid = (rateAmount > 0 ? Math.floor(paid / rateAmount) : 0) + (f.initialPaidRates || 0);
+            // Ogni pagamento = 1 rata
+            const totalRatesHP = f.payments.length + (f.initialPaidRates || 0);
+            const ratesPaid = totalRatesHP;
             const remainingMonths = f.totalMonths - ratesPaid;
-
-            const isFixedMode = (f.rateMode || 'variabile') === 'fissa' && rateAmount > 0;
-            const maxRatesHP = f.totalMonths - (f.initialPaidRates || 0);
-            const effectiveRatesHP = (() => {
-              if (!isFixedMode || rateAmount <= 0) return f.payments.length;
-              let cum = 0;
-              for (const p of f.payments) {
-                const ratio = p.amount / rateAmount;
-                const rounded = Math.round(ratio);
-                const isMult = rounded >= 1 && Math.abs(p.amount - rounded * rateAmount) < 0.01;
-                if (isMult) { cum += Math.min(rounded, Math.max(maxRatesHP - cum, 0)); } else { cum += 1; }
-              }
-              return cum;
-            })();
-            const totalRatesHP = effectiveRatesHP + (f.initialPaidRates || 0);
             const maxReachedHP = f.totalMonths > 0 && totalRatesHP >= f.totalMonths;
 
             const residuo = f.totalAmount - paid;

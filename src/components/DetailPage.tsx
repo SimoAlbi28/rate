@@ -104,47 +104,16 @@ export default function DetailPage({ financings, onUpdate }: Props) {
   const rateAmount = financing.fixedRateAmount || (financing.totalMonths > 0 ? financing.totalAmount / financing.totalMonths : 0);
   const isFixed = (financing.rateMode || 'variabile') === 'fissa' && rateAmount > 0;
 
-  // Conta quante rate vale un singolo pagamento (senza cap)
-  const countEffectiveRates = (p: Payment) => {
-    if (!isFixed || rateAmount <= 0) return 1;
-    const ratio = p.amount / rateAmount;
-    const rounded = Math.round(ratio);
-    if (rounded >= 1 && Math.abs(p.amount - rounded * rateAmount) < 0.01) return rounded;
-    return 1;
-  };
+  // Ogni pagamento = 1 rata, indipendentemente dall'importo
+  const countEffectiveRates = (_p: Payment) => 1;
 
-  // Conta rate effettive con cap: un multiplo della rata fissa vale N rate, ma non supera il totale rate
-  const maxRatesFromPayments = financing.totalMonths - (financing.initialPaidRates || 0);
-  const { effectiveRates: effectiveRatesFromPayments, excessCredit, cappedPayments } = (() => {
-    if (!isFixed || rateAmount <= 0) return { effectiveRates: financing.payments.length, excessCredit: 0, cappedPayments: [] as { payment: Payment, ratesUsed: number, accDebt: number }[] };
-    let cumulative = 0;
-    let credit = 0;
-    let runningDebt = 0; // debito accumulato da pagamenti irregolari
-    const capped: { payment: Payment, ratesUsed: number, accDebt: number }[] = [];
-    for (const p of financing.payments) {
-      const ratio = p.amount / rateAmount;
-      const rounded = Math.round(ratio);
-      const isMultiple = rounded >= 1 && Math.abs(p.amount - rounded * rateAmount) < 0.01;
-      if (isMultiple) {
-        const canAdd = Math.max(maxRatesFromPayments - cumulative, 0);
-        const actual = Math.min(rounded, canAdd);
-        cumulative += actual;
-        if (rounded > actual) {
-          credit += (rounded - actual) * rateAmount;
-          capped.push({ payment: p, ratesUsed: actual, accDebt: runningDebt });
-        }
-      } else {
-        cumulative += 1;
-        const diff = rateAmount - p.amount;
-        if (diff > 0.01) runningDebt += diff;
-      }
-    }
-    return { effectiveRates: cumulative, excessCredit: credit, cappedPayments: capped };
-  })();
+  const effectiveRatesFromPayments = financing.payments.length;
+  const excessCredit = 0;
+  const cappedPayments: { payment: Payment, ratesUsed: number, accDebt: number }[] = [];
   const totalPaymentsCount = effectiveRatesFromPayments + (financing.initialPaidRates || 0);
   const maxReached = financing.totalMonths > 0 && totalPaymentsCount >= financing.totalMonths;
 
-  const ratesPaid = (rateAmount > 0 ? Math.floor(paid / rateAmount) : 0) + (financing.initialPaidRates || 0);
+  const ratesPaid = totalPaymentsCount;
   const remainingMonths = financing.totalMonths - ratesPaid;
   const progressInterestPaid = financing.interestPerRate ? financing.interestPerRate * totalPaymentsCount : 0;
   const progressCapitalOnly = Math.max(paid - progressInterestPaid, 0);
