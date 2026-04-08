@@ -1247,7 +1247,7 @@ select {
 
 .card-separator {
   border: none;
-  border-top: 1px solid #d4edda;
+  border-top: 1px solid #999;
   margin: 6px 0;
 }
 
@@ -1566,7 +1566,7 @@ select {
 }
 
 .summary-column:first-child {
-  border-right: 1px solid #aaa;
+  border-right: 1px solid #999;
   margin-right: -0.375rem;
   padding-right: 0.375rem;
 }

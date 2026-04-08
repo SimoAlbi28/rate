@@ -347,6 +347,7 @@ export default function DetailPage({ financings, onUpdate }: Props) {
         {/* RIEPILOGO */}
         <div className="card section-card" style={{ position: 'relative' }}>
           <h3 className="section-heading" style={{ textAlign: 'center', marginBottom: '0.25rem' }}>Dati Finanziamento</h3>
+          <hr className="card-separator" />
           <div className="summary-grid">
             <div className="summary-column">
               {(financing.rateMode || 'variabile') === 'fissa' && (() => {
