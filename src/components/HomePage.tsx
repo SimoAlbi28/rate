@@ -79,6 +79,7 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
   const [quickPayDec, setQuickPayDec] = useState('');
   const [quickPayOriginal, setQuickPayOriginal] = useState('');
   const [quickPayNote, setQuickPayNote] = useState('');
+  const [quickPayDate, setQuickPayDate] = useState('');
   const [shortPayDetail, setShortPayDetail] = useState<string | null>(null);
   const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(() => {
     try {
@@ -896,6 +897,12 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                           setQuickPayOriginal('');
                           setQuickPayNote('');
                         }
+                        // Default date = today (YYYY-MM-DD in local time)
+                        const today = new Date();
+                        const yyyy = today.getFullYear();
+                        const mm = String(today.getMonth() + 1).padStart(2, '0');
+                        const dd = String(today.getDate()).padStart(2, '0');
+                        setQuickPayDate(`${yyyy}-${mm}-${dd}`);
                         setQuickPayId(f.id);
                         setTimeout(() => {
                           document.getElementById(`quickpay-${f.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1164,7 +1171,7 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                 {quickPayId === f.id ? (
                   <><hr className="card-separator" />
                   <div id={`quickpay-${f.id}`} className="quick-pay-section" onClick={(e) => e.stopPropagation()}>
-                    <div className="quick-pay-row">
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginTop: '0.75rem' }}>
                       <button
                         className="card-action-btn card-btn-cancel"
                         onClick={(e) => {
@@ -1173,53 +1180,86 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                           setQuickPayInt('');
                           setQuickPayDec('');
                           setQuickPayNote('');
+                          setQuickPayDate('');
                         }}
                       >
                         ←
                       </button>
-                      {(f.rateMode || 'variabile') === 'fissa' && quickPayOriginal && `${quickPayInt || '0'}.${quickPayDec || '0'}` !== quickPayOriginal && (
-                        <button
-                          className="btn-refresh"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const ra = f.totalMonths > 0 ? f.totalAmount / f.totalMonths : 0;
-                            setQuickPayInt(Math.floor(ra).toString());
-                            const d = Math.round((ra - Math.floor(ra)) * 100);
-                            setQuickPayDec(d > 0 ? d.toString() : '');
-                            setQuickPayNote('');
-                          }}
-                        >
-                          ↺
-                        </button>
-                      )}
-                      <input
-                        type="number"
-                        placeholder="Euro"
-                        value={quickPayInt}
-                        onChange={(e) => setQuickPayInt(e.target.value)}
-                        className="quick-pay-input"
-                      />
-                      <span className="amount-sep">,</span>
-                      <input
-                        type="number"
-                        placeholder="Cent"
-                        value={quickPayDec}
-                        onChange={(e) => setQuickPayDec(e.target.value.slice(0, 2))}
-                        className="quick-pay-input quick-pay-dec"
-                      />
-                      <span className="amount-currency">€</span>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem', flex: '0 1 auto' }}>
+                        <div className="quick-pay-row" style={{ marginTop: 0 }}>
+                          {(f.rateMode || 'variabile') === 'fissa' && quickPayOriginal && `${quickPayInt || '0'}.${quickPayDec || '0'}` !== quickPayOriginal && (
+                            <button
+                              className="btn-refresh"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const ra = f.fixedRateAmount || (f.totalMonths > 0 ? f.totalAmount / f.totalMonths : 0);
+                                setQuickPayInt(Math.floor(ra).toString());
+                                const d = Math.round((ra - Math.floor(ra)) * 100);
+                                setQuickPayDec(d > 0 ? d.toString() : '');
+                                setQuickPayNote('');
+                              }}
+                            >
+                              ↺
+                            </button>
+                          )}
+                          <input
+                            type="number"
+                            placeholder="Euro"
+                            value={quickPayInt}
+                            onChange={(e) => setQuickPayInt(e.target.value)}
+                            className="quick-pay-input"
+                          />
+                          <span className="amount-sep">,</span>
+                          <input
+                            type="number"
+                            placeholder="Cent"
+                            value={quickPayDec}
+                            onChange={(e) => setQuickPayDec(e.target.value.slice(0, 2))}
+                            className="quick-pay-input quick-pay-dec"
+                          />
+                          <span className="amount-currency">€</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
+                          <span style={{ fontSize: '0.75rem', color: '#666', fontWeight: 600 }}>Data:</span>
+                          <input
+                            type="date"
+                            value={quickPayDate}
+                            onChange={(e) => setQuickPayDate(e.target.value)}
+                            style={{ padding: '0.3rem 0.5rem', borderRadius: '0.4rem', border: '1.5px solid #ccc', fontSize: '0.8rem', outline: 'none', background: 'white', color: '#333' }}
+                          />
+                        </div>
+                        {((quickPayOriginal && `${quickPayInt || '0'}.${quickPayDec || '0'}` !== quickPayOriginal) || (f.rateMode || 'variabile') === 'variabile') && (
+                          <input
+                            type="text"
+                            placeholder="Nota (opzionale)..."
+                            value={quickPayNote}
+                            onChange={(e) => setQuickPayNote(e.target.value)}
+                            className="quick-pay-note"
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        )}
+                      </div>
                       <button
                         className="card-action-btn card-btn-confirm"
                         onClick={(e) => {
                           e.stopPropagation();
                           const val = parseFloat(`${quickPayInt || '0'}.${quickPayDec || '0'}`);
                           if (!isNaN(val) && val > 0) {
+                            // Build date keeping current local time so ordering stays sensible
+                            let isoDate: string;
+                            if (quickPayDate) {
+                              const [yy, mm, dd] = quickPayDate.split('-').map(Number);
+                              const now = new Date();
+                              isoDate = new Date(yy, (mm || 1) - 1, dd || 1, now.getHours(), now.getMinutes(), now.getSeconds()).toISOString();
+                            } else {
+                              isoDate = new Date().toISOString();
+                            }
                             onUpdate({
                               ...f,
                               payments: [...f.payments, {
                                 id: crypto.randomUUID(),
                                 amount: val,
-                                date: new Date().toISOString(),
+                                date: isoDate,
                                 ...(quickPayNote ? { note: quickPayNote } : {}),
                               }],
                             });
@@ -1229,21 +1269,12 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                           setQuickPayInt('');
                           setQuickPayDec('');
                           setQuickPayNote('');
+                          setQuickPayDate('');
                         }}
                       >
                         ✓
                       </button>
                     </div>
-                    {((quickPayOriginal && `${quickPayInt || '0'}.${quickPayDec || '0'}` !== quickPayOriginal) || (f.rateMode || 'variabile') === 'variabile') && (
-                      <input
-                        type="text"
-                        placeholder="Nota (opzionale)..."
-                        value={quickPayNote}
-                        onChange={(e) => setQuickPayNote(e.target.value)}
-                        className="quick-pay-note"
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    )}
                   </div></>
                 ) : null}
               </div>

@@ -36,6 +36,13 @@ export default function DetailPage({ financings, onUpdate }: Props) {
   const [paymentInt, setPaymentInt] = useState('');
   const [paymentDec, setPaymentDec] = useState('');
   const [paymentNote, setPaymentNote] = useState('');
+  const todayStr = () => {
+    const t = new Date();
+    return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+  };
+  const [paymentDate, setPaymentDate] = useState(todayStr);
+  // Tracks the last auto-assigned date so we can detect manual user edits
+  const lastAutoDateRef = useRef(paymentDate);
   const [originalRate, setOriginalRate] = useState('');
   const [ratePreFilled, setRatePreFilled] = useState(false);
   const [showIrregulars, setShowIrregulars] = useState(false);
@@ -86,6 +93,29 @@ export default function DetailPage({ financings, onUpdate }: Props) {
     window.addEventListener('scroll', close, true);
     return () => window.removeEventListener('scroll', close, true);
   }, [showInterestTip]);
+
+  // Keep paymentDate in sync with "today" until the user manually edits it.
+  // Triggers on focus, tab visibility change, and once a minute as fallback.
+  useEffect(() => {
+    const tick = () => {
+      const today = todayStr();
+      setPaymentDate((current) => {
+        if (current === lastAutoDateRef.current && current !== today) {
+          lastAutoDateRef.current = today;
+          return today;
+        }
+        return current;
+      });
+    };
+    const interval = window.setInterval(tick, 60000);
+    window.addEventListener('focus', tick);
+    document.addEventListener('visibilitychange', tick);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', tick);
+      document.removeEventListener('visibilitychange', tick);
+    };
+  }, []);
 
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
@@ -193,10 +223,18 @@ export default function DetailPage({ financings, onUpdate }: Props) {
     if (maxReached) return;
     const val = parseFloat(`${paymentInt || '0'}.${paymentDec || '0'}`);
     if (isNaN(val) || val <= 0) return;
+    let isoDate: string;
+    if (paymentDate) {
+      const [yy, mm, dd] = paymentDate.split('-').map(Number);
+      const now = new Date();
+      isoDate = new Date(yy, (mm || 1) - 1, dd || 1, now.getHours(), now.getMinutes(), now.getSeconds()).toISOString();
+    } else {
+      isoDate = new Date().toISOString();
+    }
     const payment: Payment = {
       id: crypto.randomUUID(),
       amount: val,
-      date: new Date().toISOString(),
+      date: isoDate,
       ...(paymentNote ? { note: paymentNote } : {}),
     };
     onUpdate({
@@ -206,6 +244,9 @@ export default function DetailPage({ financings, onUpdate }: Props) {
     setPaymentInt(isFixed ? fixedInt : '');
     setPaymentDec(isFixed && fixedDec !== '0' ? fixedDec : '');
     setPaymentNote('');
+    const today = todayStr();
+    setPaymentDate(today);
+    lastAutoDateRef.current = today;
     showToast(`Rata di ${val.toFixed(2)} € aggiunta!`);
   };
 
@@ -761,46 +802,59 @@ export default function DetailPage({ financings, onUpdate }: Props) {
             if (netBal < -0.01) return <p style={{ textAlign: 'center', color: '#e74c3c', fontWeight: 'bold', fontSize: '0.8rem', margin: '0 0 0.5rem' }}>Concluso con debito di {Math.abs(netBal).toFixed(2)} €</p>;
             return <p style={{ textAlign: 'center', color: '#27ae60', fontWeight: 'bold', fontSize: '0.8rem', margin: '0 0 0.5rem' }}>Tutte le rate sono state pagate!</p>;
           })()}
-          <div className="amount-row">
-            {isFixed && isModified && (
-              <button className="btn-refresh" onClick={() => {
-                setPaymentInt(fixedInt);
-                setPaymentDec(fixedDec !== '0' ? fixedDec : '');
-                setPaymentNote('');
-              }}>
-                ↺
-              </button>
-            )}
-            <input
-              type="number"
-              placeholder="Euro"
-              value={paymentInt}
-              onChange={(e) => setPaymentInt(e.target.value)}
-              style={{ flex: 2 }}
-            />
-            <span className="amount-sep">,</span>
-            <input
-              type="number"
-              placeholder="Cent"
-              value={paymentDec}
-              onChange={(e) => setPaymentDec(e.target.value.slice(0, 2))}
-              style={{ flex: 1 }}
-            />
-            <span className="amount-currency">€</span>
-            <button className="btn-primary btn-tick" onClick={addPayment}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+              <div className="amount-row">
+                {isFixed && isModified && (
+                  <button className="btn-refresh" onClick={() => {
+                    setPaymentInt(fixedInt);
+                    setPaymentDec(fixedDec !== '0' ? fixedDec : '');
+                    setPaymentNote('');
+                  }}>
+                    ↺
+                  </button>
+                )}
+                <input
+                  type="number"
+                  placeholder="Euro"
+                  value={paymentInt}
+                  onChange={(e) => setPaymentInt(e.target.value)}
+                  style={{ flex: 2 }}
+                />
+                <span className="amount-sep">,</span>
+                <input
+                  type="number"
+                  placeholder="Cent"
+                  value={paymentDec}
+                  onChange={(e) => setPaymentDec(e.target.value.slice(0, 2))}
+                  style={{ flex: 1 }}
+                />
+                <span className="amount-currency">€</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', marginTop: '0.5rem' }}>
+                <span style={{ fontSize: '0.8rem', color: '#666', fontWeight: 600 }}>Data:</span>
+                <input
+                  type="date"
+                  value={paymentDate}
+                  onChange={(e) => setPaymentDate(e.target.value)}
+                  style={{ padding: '0.35rem 0.6rem', borderRadius: '0.4rem', border: '1.5px solid #ccc', fontSize: '0.85rem', outline: 'none', background: 'white', color: '#333' }}
+                />
+              </div>
+              {(isModified || !isFixed) && (
+                <input
+                  type="text"
+                  placeholder="Nota (opzionale)..."
+                  value={paymentNote}
+                  onChange={(e) => setPaymentNote(e.target.value)}
+                  className="quick-pay-note"
+                  style={{ marginTop: '0.5rem' }}
+                />
+              )}
+            </div>
+            <button className="btn-primary btn-tick" onClick={addPayment} style={{ flexShrink: 0 }}>
               ✓
             </button>
           </div>
-          {(isModified || !isFixed) && (
-            <input
-              type="text"
-              placeholder="Nota (opzionale)..."
-              value={paymentNote}
-              onChange={(e) => setPaymentNote(e.target.value)}
-              className="quick-pay-note"
-              style={{ marginTop: '0.5rem' }}
-            />
-          )}
         </div>
 
         {/* STORICO PAGAMENTI */}
@@ -829,7 +883,7 @@ export default function DetailPage({ financings, onUpdate }: Props) {
                   })()}
                 </span>
               </div>
-              {[...financing.payments].reverse().map((p) => (
+              {[...financing.payments].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map((p) => (
                 <div key={p.id}>
                   <div className={`payment-item ${expandedNote === p.id && p.note ? 'note-open' : ''}`}>
                     <span className="payment-col-date">{new Date(p.date).toLocaleDateString('it-IT')}</span>

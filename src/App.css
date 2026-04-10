@@ -1003,11 +1003,6 @@ select {
   margin-top: 0.5rem;
 }
 
-.quick-pay-section:has(.quick-pay-note) .card-btn-cancel,
-.quick-pay-section:has(.quick-pay-note) .card-btn-confirm {
-  transform: translateY(1rem);
-}
-
 .quick-pay-row .btn-refresh {
   width: 28px;
   height: 28px;
