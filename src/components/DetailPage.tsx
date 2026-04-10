@@ -82,8 +82,8 @@ export default function DetailPage({ financings, onUpdate }: Props) {
   const [profileColor, setProfileColor] = useState(localStorage.getItem('profileColor') || '#3498db');
   const [showProfile, setShowProfile] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [tempProfileIcon, setTempProfileIcon] = useState(profileIcon);
-  const [tempProfileColor, setTempProfileColor] = useState(profileColor);
+  const tempProfileIcon = profileIcon;
+  const tempProfileColor = profileColor;
   const [showAllProfileIcons, setShowAllProfileIcons] = useState(false);
   const [showInterestTip, setShowInterestTip] = useState<string | null>(null);
 
