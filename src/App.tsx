@@ -125,7 +125,7 @@ function AppContent() {
         />
         <Route
           path="/impostazioni"
-          element={<SettingsPage />}
+          element={<SettingsPage financings={financings} />}
         />
         <Route
           path="/cronologia"

@@ -50,7 +50,7 @@ export default function BottomNav({ profileIcon, profileColor }: Props) {
         left: getLeft(activeTab),
         opacity: activeTab ? 1 : 0,
         transform: activeTab ? 'scaleY(1)' : 'scaleY(0)',
-        transition: skipTransition ? 'none' : 'opacity 0.3s ease, transform 0.3s ease',
+        transition: skipTransition ? 'none' : 'left 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease, transform 0.3s ease',
       }} />
       <button
         className={`bottom-nav-btn ${activeTab === 'riepilogo' ? 'active' : ''}`}
@@ -67,7 +67,7 @@ export default function BottomNav({ profileIcon, profileColor }: Props) {
         onClick={() => navigate('/')}
       >
         <div className="bottom-nav-icon">
-          <Home size={22} />
+          <Home size={22} color={activeTab === 'home' ? '#27ae60' : undefined} />
         </div>
         <span>Home</span>
       </button>

@@ -268,28 +268,28 @@ export default function RiepilogoPage({ financings }: Props) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
             {piuGrande && (
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', borderBottom: '1px solid #eee' }}>
-                <span style={{ fontSize: '0.8rem', color: '#666' }}>Finanziamento più grande</span>
+                <span style={{ fontSize: '0.8rem', color: 'var(--theme-text-secondary, #666)' }}>Finanziamento più grande</span>
                 <span style={{ fontSize: '0.8rem', fontWeight: '600', color: '#333' }}>{piuGrande.emoji} {piuGrande.name} ({piuGrande.totalAmount.toFixed(2)} €)</span>
               </div>
             )}
             {piuPiccolo && piuPiccolo.id !== piuGrande?.id && (
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', borderBottom: '1px solid #eee' }}>
-                <span style={{ fontSize: '0.8rem', color: '#666' }}>Finanziamento più piccolo</span>
+                <span style={{ fontSize: '0.8rem', color: 'var(--theme-text-secondary, #666)' }}>Finanziamento più piccolo</span>
                 <span style={{ fontSize: '0.8rem', fontWeight: '600', color: '#333' }}>{piuPiccolo.emoji} {piuPiccolo.name} ({piuPiccolo.totalAmount.toFixed(2)} €)</span>
               </div>
             )}
             {prossimaScadenza && (
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', borderBottom: '1px solid #eee' }}>
-                <span style={{ fontSize: '0.8rem', color: '#666' }}>Prossima scadenza</span>
+                <span style={{ fontSize: '0.8rem', color: 'var(--theme-text-secondary, #666)' }}>Prossima scadenza</span>
                 <span style={{ fontSize: '0.8rem', fontWeight: '600', color: '#e67e22' }}>{prossimaScadenza.emoji} {prossimaScadenza.name} ({new Date(prossimaScadenza.endDate).toLocaleDateString('it-IT')})</span>
               </div>
             )}
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', borderBottom: '1px solid #eee' }}>
-              <span style={{ fontSize: '0.8rem', color: '#666' }}>Importo medio per cartella</span>
+              <span style={{ fontSize: '0.8rem', color: 'var(--theme-text-secondary, #666)' }}>Importo medio per cartella</span>
               <span style={{ fontSize: '0.8rem', fontWeight: '600', color: '#333' }}>{totaleFinanziamenti > 0 ? fmtEuro(totaleDaPagare / totaleFinanziamenti) : '- €'}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0' }}>
-              <span style={{ fontSize: '0.8rem', color: '#666' }}>Rate medie per cartella</span>
+              <span style={{ fontSize: '0.8rem', color: 'var(--theme-text-secondary, #666)' }}>Rate medie per cartella</span>
               <span style={{ fontSize: '0.8rem', fontWeight: '600', color: '#333' }}>{totaleFinanziamenti > 0 ? (totalRateTotali / totaleFinanziamenti).toFixed(1) : '-'}</span>
             </div>
           </div>

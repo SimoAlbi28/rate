@@ -1,3 +1,26 @@
+/* ===== THEME TOKENS ===== */
+:root {
+  --theme-bg-page: #d0e8d2;
+  --theme-bg-card: #ffffff;
+  --theme-bg-navbar: linear-gradient(135deg, #2d5a3d 0%, #1e3f2a 100%);
+  --theme-bg-sticky: #d0e8d2;
+  --theme-text-primary: #2d5a3d;
+  --theme-text-secondary: #6b9e7d;
+  --theme-border: rgba(0, 0, 0, 0.12);
+  --theme-card-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+html[data-theme="dark"] {
+  --theme-bg-page: #000000;
+  --theme-bg-card: #1a1a1a;
+  --theme-bg-navbar: linear-gradient(135deg, #0b1a10 0%, #040a06 100%);
+  --theme-bg-sticky: #000000;
+  --theme-text-primary: #f1faf3;
+  --theme-text-secondary: #a8cdb3;
+  --theme-border: rgba(255, 255, 255, 0.18);
+  --theme-card-shadow: 0 2px 12px rgba(0, 0, 0, 0.7);
+}
+
 /* ===== GLOBAL ===== */
 * {
   margin: 0;
@@ -11,11 +34,186 @@ html {
 
 body {
   font-family: -apple-system, 'Segoe UI', system-ui, Roboto, sans-serif;
-  background: #d0e8d2;
+  background: var(--theme-bg-page);
   min-height: 100vh;
-  color: #2d5a3d;
+  color: var(--theme-text-primary);
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
+  transition: background 0.25s ease, color 0.25s ease;
+}
+
+html[data-theme="dark"] .page {
+  background: var(--theme-bg-page);
+}
+
+html[data-theme="dark"] .home-sticky-top,
+html[data-theme="dark"] .sticky-bar {
+  background: var(--theme-bg-sticky) !important;
+}
+
+html[data-theme="dark"] .navbar {
+  background: linear-gradient(135deg, #0e2a18 0%, #163d24 50%, #0e2a18 100%) !important;
+}
+
+/* Toolbar buttons darker in dark mode */
+html[data-theme="dark"] .toolbar-btn,
+html[data-theme="dark"] .toolbar-btn-search {
+  background: #c8c8c8 !important;
+  color: #1a1a1a !important;
+  border-color: rgba(0,0,0,0.4) !important;
+}
+html[data-theme="dark"] .toolbar-btn-search svg {
+  color: #1a1a1a !important;
+}
+html[data-theme="dark"] .toolbar-btn-create {
+  background: linear-gradient(135deg, #1d8a4a, #166b3a) !important;
+  color: white !important;
+}
+
+html[data-theme="dark"] .sticky-bar::after {
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.35) 10%, rgba(255,255,255,0.35) 90%, transparent 100%) !important;
+}
+
+html[data-theme="dark"] .card.section-card,
+html[data-theme="dark"] .card.financing-card {
+  background: var(--theme-bg-card) !important;
+  color: var(--theme-text-primary);
+  box-shadow: var(--theme-card-shadow);
+}
+
+html[data-theme="dark"] .card.financing-card .card-info-center {
+  color: var(--theme-text-primary);
+}
+/* Default color for .card-info but only when no semantic variant is present */
+html[data-theme="dark"] .card.financing-card .card-info:not(.card-info-red):not(.card-info-green):not(.card-info-yellow) {
+  color: var(--theme-text-primary);
+}
+
+html[data-theme="dark"] .bottom-nav {
+  background: var(--theme-bg-card);
+  border-top-color: rgba(255, 255, 255, 0.15);
+}
+
+/* ===== DARK MODE TEXT OVERRIDES =====
+   Forza i testi comuni a essere bianchi/chiari in dark mode.
+   Usa !important perché molti colori sono inline negli elementi.
+   I colori semantici (verde importo, rosso debito, viola rata fissa, ecc.)
+   restano invariati perché applicati su elementi con inline style più specifici
+   o su classi dedicate. */
+html[data-theme="dark"] .card.section-card,
+html[data-theme="dark"] .card.section-card h3,
+html[data-theme="dark"] .card.section-card p,
+html[data-theme="dark"] .card.section-card label,
+html[data-theme="dark"] .card.section-card .section-heading,
+html[data-theme="dark"] .detail-riepilogo-bar .section-heading {
+  color: var(--theme-text-primary) !important;
+}
+
+
+html[data-theme="dark"] .sticky-bar,
+html[data-theme="dark"] .sticky-bar h2,
+html[data-theme="dark"] .sticky-bar h3,
+html[data-theme="dark"] .section-title {
+  color: var(--theme-text-primary) !important;
+}
+
+html[data-theme="dark"] .card-separator,
+html[data-theme="dark"] .card.section-card hr,
+html[data-theme="dark"] .card.financing-card hr {
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  border-top-color: rgba(255, 255, 255, 0.18) !important;
+  background: transparent !important;
+  opacity: 1 !important;
+}
+
+/* Input / textarea / select nei card in dark mode */
+html[data-theme="dark"] .card.section-card input[type="text"],
+html[data-theme="dark"] .card.section-card input[type="email"],
+html[data-theme="dark"] .card.section-card input[type="password"],
+html[data-theme="dark"] .card.section-card input[type="number"],
+html[data-theme="dark"] .card.section-card input[type="date"],
+html[data-theme="dark"] .card.section-card textarea,
+html[data-theme="dark"] .card.section-card select {
+  background: #3a4f44 !important;
+  color: var(--theme-text-primary) !important;
+  border-color: rgba(255, 255, 255, 0.25) !important;
+}
+
+html[data-theme="dark"] .card.section-card input::placeholder,
+html[data-theme="dark"] .card.section-card textarea::placeholder {
+  color: rgba(255, 255, 255, 0.45) !important;
+}
+
+/* Bottom nav text in dark mode */
+html[data-theme="dark"] .bottom-nav,
+html[data-theme="dark"] .bottom-nav-btn {
+  color: var(--theme-text-primary) !important;
+}
+
+/* Home search input in dark mode */
+html[data-theme="dark"] .search-input {
+  background: #3a4f44 !important;
+  color: var(--theme-text-primary) !important;
+  border-color: rgba(255, 255, 255, 0.25) !important;
+}
+html[data-theme="dark"] .search-input::placeholder {
+  color: rgba(255, 255, 255, 0.45) !important;
+}
+
+/* Cronologia: card selezionate per la rimozione */
+.card.section-card.crono-card-selected {
+  background: #fdecea !important;
+  border-color: #e74c3c !important;
+  box-shadow: 0 0 0 2px rgba(231, 76, 60, 0.25) !important;
+}
+html[data-theme="dark"] .card.section-card.crono-card-selected {
+  background: #5a1414 !important;
+  border-color: #e74c3c !important;
+  box-shadow: 0 0 0 2px rgba(231, 76, 60, 0.55) !important;
+  color: #ffd0c8 !important;
+}
+
+/* Modal in dark mode (Nuova/Modifica Cartella, conferme, ecc.) */
+html[data-theme="dark"] .modal {
+  background: var(--theme-bg-card) !important;
+  color: var(--theme-text-primary) !important;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7) !important;
+}
+html[data-theme="dark"] .modal h3,
+html[data-theme="dark"] .modal h4,
+html[data-theme="dark"] .modal label,
+html[data-theme="dark"] .modal p,
+html[data-theme="dark"] .modal span {
+  color: var(--theme-text-primary) !important;
+}
+html[data-theme="dark"] .modal > input,
+html[data-theme="dark"] .modal input[type="text"],
+html[data-theme="dark"] .modal input[type="number"],
+html[data-theme="dark"] .modal input[type="date"],
+html[data-theme="dark"] .modal textarea,
+html[data-theme="dark"] .modal select {
+  background: #2a2a2a !important;
+  color: var(--theme-text-primary) !important;
+  border-color: rgba(255,255,255,0.25) !important;
+}
+html[data-theme="dark"] .modal input::placeholder,
+html[data-theme="dark"] .modal textarea::placeholder {
+  color: rgba(255,255,255,0.4) !important;
+}
+html[data-theme="dark"] .modal hr {
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  border-top-color: rgba(255, 255, 255, 0.18) !important;
+}
+
+/* Card top-row backgrounds inverted for dark mode */
+html[data-theme="dark"] .card-top-row.card-top-fissa {
+  background: #3d2a52 !important; /* viola scuro */
+}
+html[data-theme="dark"] .card-top-row.card-top-variabile {
+  background: #a51866 !important; /* rosa meno acceso */
+}
+html[data-theme="dark"] .card-top-row .card-name {
+  color: #ffffff !important;
 }
 
 input, select, button {
@@ -23,6 +221,14 @@ input, select, button {
   -webkit-appearance: none;
   -moz-appearance: none;
   appearance: none;
+}
+
+/* Restore native appearance for checkboxes and radios */
+input[type="checkbox"],
+input[type="radio"] {
+  -webkit-appearance: auto;
+  -moz-appearance: auto;
+  appearance: auto;
 }
 
 select {
@@ -788,9 +994,11 @@ select {
   100% { --border-angle: 360deg; }
 }
 
-.financing-card:hover {
-  transform: translateY(-2px);
-  box-shadow: none;
+@media (hover: hover) and (pointer: fine) {
+  .financing-card:hover {
+    transform: translateY(-2px);
+    box-shadow: none;
+  }
 }
 
 .financing-card:active {

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { LogOut, LogIn, Settings, History, User } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 
@@ -13,7 +13,19 @@ const ANIM_MS = 180;
 
 export default function ProfileMenu({ onClose, variant = 'full' }: Props) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isGuest, signOut } = useAuth();
+  const activeBg = '#d6ecfa';
+  const activeColor = '#2980b9';
+  const isActive = (path: string) => location.pathname === path;
+  const itemStyle = (path: string, baseColor: string, baseWeight: string): React.CSSProperties => ({
+    width: '100%', padding: '0.7rem 1rem', border: 'none',
+    background: isActive(path) ? activeBg : 'none',
+    textAlign: 'center', fontSize: '0.85rem', cursor: 'pointer',
+    color: isActive(path) ? activeColor : baseColor,
+    fontWeight: isActive(path) ? '700' : baseWeight,
+    borderBottom: '1px solid #eee',
+  });
   const [open, setOpen] = useState(false);
   const [closing, setClosing] = useState(false);
   const closeTimer = useRef<number | null>(null);
@@ -84,13 +96,15 @@ export default function ProfileMenu({ onClose, variant = 'full' }: Props) {
           <>
             <button
               onClick={() => handleNavigate('/cronologia')}
-              className="profile-menu-item" style={{ width: '100%', padding: '0.7rem 1rem', border: 'none', background: 'none', textAlign: 'center', fontSize: '0.85rem', cursor: 'pointer', color: '#333', fontWeight: '500', borderBottom: '1px solid #eee' }}
+              className="profile-menu-item"
+              style={itemStyle('/cronologia', '#333', '500')}
             >
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}><History size={14} /> Cronologia</span>
             </button>
             <button
               onClick={() => handleNavigate('/impostazioni')}
-              style={{ width: '100%', padding: '0.7rem 1rem', border: 'none', background: 'none', textAlign: 'center', fontSize: '0.85rem', cursor: 'pointer', color: '#333', fontWeight: '500' }}
+              className="profile-menu-item"
+              style={{ ...itemStyle('/impostazioni', '#333', '500'), borderBottom: 'none' }}
             >
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}><Settings size={14} /> Impostazioni</span>
             </button>
@@ -99,19 +113,22 @@ export default function ProfileMenu({ onClose, variant = 'full' }: Props) {
           <>
             <button
               onClick={() => handleNavigate('/profilo')}
-              className="profile-menu-item" style={{ width: '100%', padding: '0.7rem 1rem', border: 'none', background: 'none', textAlign: 'center', fontSize: '0.85rem', cursor: 'pointer', color: '#333', fontWeight: '500', borderBottom: '1px solid #eee' }}
+              className="profile-menu-item"
+              style={itemStyle('/profilo', '#333', '500')}
             >
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}><User size={14} /> Profilo</span>
             </button>
             <button
               onClick={() => handleNavigate('/cronologia')}
-              className="profile-menu-item" style={{ width: '100%', padding: '0.7rem 1rem', border: 'none', background: 'none', textAlign: 'center', fontSize: '0.85rem', cursor: 'pointer', color: '#333', fontWeight: '500', borderBottom: '1px solid #eee' }}
+              className="profile-menu-item"
+              style={itemStyle('/cronologia', '#333', '500')}
             >
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}><History size={14} /> Cronologia</span>
             </button>
             <button
               onClick={() => handleNavigate('/impostazioni')}
-              className="profile-menu-item" style={{ width: '100%', padding: '0.7rem 1rem', border: 'none', background: 'none', textAlign: 'center', fontSize: '0.85rem', cursor: 'pointer', color: '#333', fontWeight: '500', borderBottom: '1px solid #eee' }}
+              className="profile-menu-item"
+              style={itemStyle('/impostazioni', '#333', '500')}
             >
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}><Settings size={14} /> Impostazioni</span>
             </button>

@@ -850,7 +850,7 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                   });
                 }}
               >
-                <div className="card-top-row" style={{ background: (f.rateMode || 'variabile') === 'fissa' ? '#f3e8ff' : '#ffe8f0', borderRadius: '0.75rem', margin: '-1rem -1rem 0', padding: '0.75rem 1rem' }}>
+                <div className={`card-top-row ${(f.rateMode || 'variabile') === 'fissa' ? 'card-top-fissa' : 'card-top-variabile'}`} style={{ background: (f.rateMode || 'variabile') === 'fissa' ? '#f3e8ff' : '#ffe8f0', borderRadius: '0.75rem', margin: '-1rem -1rem 0', padding: '0.75rem 1rem' }}>
                   <div className="card-emoji">{f.emoji}</div>
                   <div className="card-name">{f.name.charAt(0).toUpperCase() + f.name.slice(1)}</div>
                   <div className="card-actions">
@@ -948,7 +948,7 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                               const r = f.totalAmount - (capitalPaid > 0 ? capitalPaid : 0);
                               return r > 0.004 ? r.toFixed(2) + ' €' : '- €';
                             })()}</span></div>
-                            <hr style={{ border: 'none', borderTop: '1px solid #000', margin: '6px 0', opacity: 0.3 }} />
+                            <hr style={{ border: 'none', borderTop: '1px solid var(--theme-border, rgba(0,0,0,0.3))', margin: '6px 0' }} />
                             <div className="card-info-center" style={{ color: '#3498db', fontWeight: 'bold', textTransform: 'uppercase' as const }}>Con interessi</div>
                             <div className="card-info" style={{ color: '#e74c3c' }}><span>Totale da pagare:</span><span>{(f.totalAmount + f.interestPerRate * f.totalMonths).toFixed(2)} €</span></div>
                             <div className="card-info" style={{ color: '#1abc9c' }}><span>Totale Pagato:</span><span>{paid > 0.004 ? paid.toFixed(2) + ' €' : '- €'}</span></div>
@@ -959,7 +959,7 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                               const restante = capitalRemaining + interestRemaining;
                               return restante > 0.004 ? restante.toFixed(2) + ' €' : '- €';
                             })()}</span></div>
-                            <hr style={{ border: 'none', borderTop: '1px solid #000', margin: '6px 0', opacity: 0.3 }} />
+                            <hr style={{ border: 'none', borderTop: '1px solid var(--theme-border, rgba(0,0,0,0.3))', margin: '6px 0' }} />
                           </>
                         ) : (
                           <>
@@ -974,7 +974,7 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                     );
                   })()}
                 </div>
-                <div className="card-info-center" style={{ color: '#333', fontWeight: 'bold', fontSize: '0.75rem', letterSpacing: '1px' }}>AVANZAMENTO</div>
+                <div className="card-info-center" style={{ color: 'var(--theme-text-primary, #333)', fontWeight: 'bold', fontSize: '0.75rem', letterSpacing: '1px' }}>AVANZAMENTO</div>
                 {(() => {
                   const isFixedProg = (f.rateMode || 'variabile') === 'fissa';
                   const totalRatesPaidProg = f.payments.length + (f.initialPaidRates || 0);

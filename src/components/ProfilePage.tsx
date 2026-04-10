@@ -119,8 +119,8 @@ export default function ProfilePage() {
     const isDisabled = (field === 'email' || field === 'password') && isGuest;
 
     return (
-      <div style={{ padding: '0.75rem 0', borderBottom: '1px solid #eee' }}>
-        <div style={{ fontSize: '0.7rem', color: '#999', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '0.3rem' }}>{label}</div>
+      <div style={{ padding: '0.75rem 0', borderBottom: '1px solid var(--theme-border, #eee)' }}>
+        <div style={{ fontSize: '0.7rem', color: 'var(--theme-text-secondary, #999)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '0.3rem' }}>{label}</div>
         {isEditing ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <input
@@ -140,7 +140,7 @@ export default function ProfilePage() {
           </div>
         ) : (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '0.95rem', color: value ? '#333' : '#ccc', fontStyle: value ? 'normal' : 'italic' }}>{displayValue}</span>
+            <span style={{ fontSize: '0.95rem', color: value ? 'var(--theme-text-primary, #333)' : 'var(--theme-text-secondary, #ccc)', fontStyle: value ? 'normal' : 'italic' }}>{displayValue}</span>
             <div style={{ display: 'flex', gap: '0.4rem' }}>
               {options?.isPassword && (
                 <button onClick={() => setShowPassword(!showPassword)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.2rem', color: '#999' }}>

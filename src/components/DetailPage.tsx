@@ -375,8 +375,8 @@ export default function DetailPage({ financings, onUpdate }: Props) {
           </button>
         </nav>
         {showProfileMenu && <ProfileMenu onClose={() => setShowProfileMenu(false)} />}
-        <div style={{ background: '#d0e8d2', padding: '0.5rem 1rem 0.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'white', borderRadius: '1rem', padding: '0.6rem 1rem', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+        <div className="detail-riepilogo-bar-wrap" style={{ background: 'var(--theme-bg-sticky, #d0e8d2)', padding: '0.5rem 1rem 0.5rem' }}>
+          <div className="detail-riepilogo-bar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--theme-bg-card, white)', borderRadius: '1rem', padding: '0.6rem 1rem', boxShadow: 'var(--theme-card-shadow, 0 2px 8px rgba(0,0,0,0.08))' }}>
             <span className="riepilogo-icon-box" onClick={() => navigate('/')} style={{ position: 'relative', width: 36, height: 36, display: 'inline-flex', flexShrink: 0, borderRadius: '0.45rem', cursor: 'pointer' }}>
               <AppsListDetail24Regular style={{ fontSize: 20, color: '#2ecc71', position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', clipPath: 'inset(0 0 50% 0)' }} />
               <AppsListDetail24Regular style={{ fontSize: 20, color: '#e74c3c', position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', clipPath: 'inset(50% 0 0 0)' }} />
@@ -914,7 +914,7 @@ export default function DetailPage({ financings, onUpdate }: Props) {
               return (
                 <div style={{ marginTop: '0.75rem', textAlign: 'center' }}>
                   <hr style={{ border: 'none', borderTop: '1px solid rgba(0,0,0,0.1)', margin: '0.5rem 0' }} />
-                  <div style={{ fontWeight: 'bold', fontSize: '0.85rem', color: '#333' }}>
+                  <div style={{ fontWeight: 'bold', fontSize: '0.85rem', color: 'var(--theme-text-primary, #333)' }}>
                     Totale pagato: {totalePagato.toFixed(2)} €
                   </div>
                   {isFixed && Math.abs(netDiff) >= 0.01 && (

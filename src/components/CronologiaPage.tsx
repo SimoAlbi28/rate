@@ -355,8 +355,9 @@ export default function CronologiaPage({ financings }: Props) {
                     return new Date(r.payment.date).toLocaleDateString('it-IT');
                 }
               };
+              const separatorsEnabled = localStorage.getItem('settings-cronologia-separators') !== '0';
               const prev = idx > 0 ? visibleRows[idx - 1] : null;
-              const showSeparator = !prev || groupKey(prev) !== groupKey(row);
+              const showSeparator = separatorsEnabled && (!prev || groupKey(prev) !== groupKey(row));
               const cardStyle: React.CSSProperties = {
                 padding: '0.6rem 0.8rem',
                 cursor: 'pointer',
@@ -365,11 +366,7 @@ export default function CronologiaPage({ financings }: Props) {
                 gap: '0.4rem',
                 transition: 'background 0.15s, border-color 0.15s',
               };
-              if (isSelected) {
-                cardStyle.background = '#fdecea';
-                cardStyle.borderColor = '#e74c3c';
-                cardStyle.boxShadow = '0 0 0 2px rgba(231, 76, 60, 0.25)';
-              }
+              // Selection highlight is handled via CSS class so dark mode can override
               return (
                 <div key={payment.id} style={{ display: 'contents' }}>
                   {showSeparator && (
@@ -390,7 +387,7 @@ export default function CronologiaPage({ financings }: Props) {
                     if (selectionMode) toggleSelected(payment.id);
                     else navigate(`/detail/${financing.id}`);
                   }}
-                  className="card section-card"
+                  className={`card section-card ${isSelected ? 'crono-card-selected' : ''}`}
                   style={cardStyle}
                 >
                   <div style={{ textAlign: 'center', fontWeight: 700, fontSize: '0.85rem', color: accent, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}>
