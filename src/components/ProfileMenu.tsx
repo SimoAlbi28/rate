@@ -84,7 +84,7 @@ export default function ProfileMenu({ onClose, variant = 'full' }: Props) {
           <>
             <button
               onClick={() => handleNavigate('/cronologia')}
-              style={{ width: '100%', padding: '0.7rem 1rem', border: 'none', background: 'none', textAlign: 'center', fontSize: '0.85rem', cursor: 'pointer', color: '#333', fontWeight: '500', borderBottom: '1px solid #eee' }}
+              className="profile-menu-item" style={{ width: '100%', padding: '0.7rem 1rem', border: 'none', background: 'none', textAlign: 'center', fontSize: '0.85rem', cursor: 'pointer', color: '#333', fontWeight: '500', borderBottom: '1px solid #eee' }}
             >
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}><History size={14} /> Cronologia</span>
             </button>
@@ -99,25 +99,26 @@ export default function ProfileMenu({ onClose, variant = 'full' }: Props) {
           <>
             <button
               onClick={() => handleNavigate('/profilo')}
-              style={{ width: '100%', padding: '0.7rem 1rem', border: 'none', background: 'none', textAlign: 'center', fontSize: '0.85rem', cursor: 'pointer', color: '#333', fontWeight: '500', borderBottom: '1px solid #eee' }}
+              className="profile-menu-item" style={{ width: '100%', padding: '0.7rem 1rem', border: 'none', background: 'none', textAlign: 'center', fontSize: '0.85rem', cursor: 'pointer', color: '#333', fontWeight: '500', borderBottom: '1px solid #eee' }}
             >
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}><User size={14} /> Profilo</span>
             </button>
             <button
               onClick={() => handleNavigate('/cronologia')}
-              style={{ width: '100%', padding: '0.7rem 1rem', border: 'none', background: 'none', textAlign: 'center', fontSize: '0.85rem', cursor: 'pointer', color: '#333', fontWeight: '500', borderBottom: '1px solid #eee' }}
+              className="profile-menu-item" style={{ width: '100%', padding: '0.7rem 1rem', border: 'none', background: 'none', textAlign: 'center', fontSize: '0.85rem', cursor: 'pointer', color: '#333', fontWeight: '500', borderBottom: '1px solid #eee' }}
             >
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}><History size={14} /> Cronologia</span>
             </button>
             <button
               onClick={() => handleNavigate('/impostazioni')}
-              style={{ width: '100%', padding: '0.7rem 1rem', border: 'none', background: 'none', textAlign: 'center', fontSize: '0.85rem', cursor: 'pointer', color: '#333', fontWeight: '500', borderBottom: '1px solid #eee' }}
+              className="profile-menu-item" style={{ width: '100%', padding: '0.7rem 1rem', border: 'none', background: 'none', textAlign: 'center', fontSize: '0.85rem', cursor: 'pointer', color: '#333', fontWeight: '500', borderBottom: '1px solid #eee' }}
             >
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}><Settings size={14} /> Impostazioni</span>
             </button>
             {isGuest ? (
               <button
                 onClick={handleSignOut}
+                className="profile-menu-item"
                 style={{ width: '100%', padding: '0.7rem 1rem', border: 'none', background: 'none', textAlign: 'center', fontSize: '0.85rem', cursor: 'pointer', color: '#3498db', fontWeight: '600' }}
               >
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}><LogIn size={14} /> Login</span>
@@ -125,6 +126,7 @@ export default function ProfileMenu({ onClose, variant = 'full' }: Props) {
             ) : (
               <button
                 onClick={handleSignOut}
+                className="profile-menu-item"
                 style={{ width: '100%', padding: '0.7rem 1rem', border: 'none', background: 'none', textAlign: 'center', fontSize: '0.85rem', cursor: 'pointer', color: '#e74c3c', fontWeight: '600' }}
               >
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}><LogOut size={14} /> Logout</span>

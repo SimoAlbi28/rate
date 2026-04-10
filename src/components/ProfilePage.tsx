@@ -65,7 +65,6 @@ export default function ProfilePage() {
   const email = user?.email || '';
   const [savedPwd, setSavedPwd] = useState(() => localStorage.getItem('profile-pwd-hint') || '');
   const passwordMask = '••••••••';
-  const [firstLogin, setFirstLogin] = useState(() => localStorage.getItem('rate-first-login') === 'true');
 
   const startEdit = (field: string, currentValue: string) => {
     setEditingField(field);
@@ -249,33 +248,6 @@ export default function ProfilePage() {
               </div>
             </div>
           </div>
-        )}
-
-        {firstLogin && user && !savedPwd && (
-          <>
-            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 9998 }} />
-            <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'white', borderRadius: '1rem', padding: '1.5rem', zIndex: 9999, maxWidth: '85vw', width: '320px', boxShadow: '0 8px 30px rgba(0,0,0,0.2)', textAlign: 'center' }}>
-              <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🔐</div>
-              <h3 style={{ margin: '0 0 0.5rem', color: '#333', fontSize: '1rem' }}>Salva la tua password</h3>
-              <p style={{ color: '#666', fontSize: '0.8rem', margin: '0 0 1rem', lineHeight: '1.4' }}>
-                Scrivi la tua password nel campo "Password" qui sotto per poterla consultare in futuro. Verrà salvata solo su questo dispositivo.
-              </p>
-              <button
-                onClick={() => { setFirstLogin(false); localStorage.removeItem('rate-first-login'); startEdit('password', ''); }}
-                style={{ background: '#27ae60', color: 'white', border: 'none', borderRadius: '0.5rem', padding: '0.6rem 1.5rem', fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer', width: '100%' }}
-              >
-                {savedPwd ? 'Ho capito' : 'Salva ora'}
-              </button>
-              {savedPwd && (
-                <button
-                  onClick={() => { setFirstLogin(false); localStorage.removeItem('rate-first-login'); }}
-                  style={{ background: 'none', border: 'none', color: '#e74c3c', fontSize: '0.75rem', cursor: 'pointer', marginTop: '0.5rem' }}
-                >
-                  Password già salvata, chiudi
-                </button>
-              )}
-            </div>
-          </>
         )}
 
         {isGuest && (

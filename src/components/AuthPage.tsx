@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 
 export default function AuthPage() {
@@ -9,6 +10,8 @@ export default function AuthPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
@@ -52,14 +55,15 @@ export default function AuthPage() {
         setError(error);
       } else {
         localStorage.setItem('rate-first-login', 'true');
-        setSuccess('Account creato! Reindirizzamento...');
+        setSuccess('Registrazione avvenuta con successo');
         setLoading(false);
         setTimeout(() => {
           setMode('login');
-          setSuccess('');
+          // Keep email and password prefilled so user only has to click "Accedi"
           setNome('');
           setCognome('');
           setConfirmPassword('');
+          setSuccess('');
         }, 2000);
         return;
       }
@@ -119,27 +123,46 @@ export default function AuthPage() {
               style={{ padding: '0.6rem 0.8rem', borderRadius: '0.5rem', border: '1.5px solid #ccc', fontSize: '0.9rem', outline: 'none' }}
               onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
             />
-            <input
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              style={{ padding: '0.6rem 0.8rem', borderRadius: '0.5rem', border: '1.5px solid #ccc', fontSize: '0.9rem', outline: 'none' }}
-              onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-            />
-            {mode === 'register' && (
+            <div style={{ position: 'relative' }}>
               <input
-                type="password"
-                placeholder="Conferma password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                style={{ padding: '0.6rem 0.8rem', borderRadius: '0.5rem', border: '1.5px solid #ccc', fontSize: '0.9rem', outline: 'none' }}
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                style={{ width: '100%', padding: '0.6rem 2.4rem 0.6rem 0.8rem', borderRadius: '0.5rem', border: '1.5px solid #ccc', fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box' }}
                 onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{ position: 'absolute', right: '0.6rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: '0.2rem', display: 'flex', alignItems: 'center', color: '#888' }}
+                title={showPassword ? 'Nascondi password' : 'Mostra password'}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+            {mode === 'register' && (
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  placeholder="Conferma password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  style={{ width: '100%', padding: '0.6rem 2.4rem 0.6rem 0.8rem', borderRadius: '0.5rem', border: '1.5px solid #ccc', fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box' }}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  style={{ position: 'absolute', right: '0.6rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: '0.2rem', display: 'flex', alignItems: 'center', color: '#888' }}
+                  title={showConfirmPassword ? 'Nascondi password' : 'Mostra password'}
+                >
+                  {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             )}
 
             {error && <p style={{ color: '#e74c3c', fontSize: '0.8rem', textAlign: 'center', margin: 0 }}>{error}</p>}
-            {success && <p style={{ color: '#27ae60', fontSize: '0.8rem', textAlign: 'center', margin: 0 }}>{success}</p>}
 
             <button
               onClick={handleSubmit}
@@ -196,6 +219,11 @@ export default function AuthPage() {
             </p>
           </div>
         </div>
+        {success && (
+          <p style={{ color: '#27ae60', fontSize: '0.9rem', fontWeight: 700, textAlign: 'center', margin: '1rem auto 0', maxWidth: 400 }}>
+            {success}
+          </p>
+        )}
       </div>
     </div>
   );

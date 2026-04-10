@@ -324,10 +324,39 @@ export default function CronologiaPage({ financings }: Props) {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-            {visibleRows.map(({ payment, financing }) => {
+            {visibleRows.map((row, idx) => {
+              const { payment, financing } = row;
               const rateMode = financing.rateMode || 'variabile';
               const accent = rateMode === 'fissa' ? '#8e44ad' : '#e91e8a';
               const isSelected = selectedIds.has(payment.id);
+
+              // Group separator: insert before the first card of each new group
+              const groupKey = (r: PaymentRow): string => {
+                switch (sortMode) {
+                  case 'amount-desc':
+                  case 'amount-asc':
+                    return r.payment.amount.toFixed(2);
+                  case 'alpha':
+                    return r.financing.id;
+                  case 'date':
+                  default:
+                    return new Date(r.payment.date).toLocaleDateString('it-IT');
+                }
+              };
+              const groupLabel = (r: PaymentRow): string => {
+                switch (sortMode) {
+                  case 'amount-desc':
+                  case 'amount-asc':
+                    return `${r.payment.amount.toFixed(2)} €`;
+                  case 'alpha':
+                    return `${r.financing.emoji} ${r.financing.name}`;
+                  case 'date':
+                  default:
+                    return new Date(r.payment.date).toLocaleDateString('it-IT');
+                }
+              };
+              const prev = idx > 0 ? visibleRows[idx - 1] : null;
+              const showSeparator = !prev || groupKey(prev) !== groupKey(row);
               const cardStyle: React.CSSProperties = {
                 padding: '0.6rem 0.8rem',
                 cursor: 'pointer',
@@ -342,8 +371,17 @@ export default function CronologiaPage({ financings }: Props) {
                 cardStyle.boxShadow = '0 0 0 2px rgba(231, 76, 60, 0.25)';
               }
               return (
+                <div key={payment.id} style={{ display: 'contents' }}>
+                  {showSeparator && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: idx === 0 ? '0 0.25rem 0.1rem' : '0.5rem 0.25rem 0.1rem' }}>
+                      <div style={{ flex: 1, height: 1, background: 'rgba(0,0,0,0.15)' }} />
+                      <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#666', letterSpacing: '0.5px', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+                        {groupLabel(row)}
+                      </span>
+                      <div style={{ flex: 1, height: 1, background: 'rgba(0,0,0,0.15)' }} />
+                    </div>
+                  )}
                 <div
-                  key={payment.id}
                   ref={(el) => {
                     if (el) cardRefs.current.set(payment.id, el);
                     else cardRefs.current.delete(payment.id);
@@ -369,6 +407,7 @@ export default function CronologiaPage({ financings }: Props) {
                       {payment.note}
                     </div>
                   )}
+                </div>
                 </div>
               );
             })}

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import type { Financing, RateType } from './types';
 import { loadFinancings, saveFinancings, saveFinancingsToCloud, mergeLocalToCloud } from './storage';
 import { AuthProvider, useAuth } from './AuthContext';
@@ -17,7 +17,6 @@ function AppContent() {
   const { user, loading, isGuest } = useAuth();
   const [financings, setFinancings] = useState<Financing[]>([]);
   const [dataLoaded, setDataLoaded] = useState(false);
-  const [redirectToProfile, setRedirectToProfile] = useState(false);
   const profileIcon = localStorage.getItem('profileIcon') || '👤';
   const profileColor = localStorage.getItem('profileColor') || '#3498db';
 
@@ -39,13 +38,9 @@ function AppContent() {
     load();
   }, [user, loading]);
 
-  // First login redirect
+  // Clear the first-login flag if present (no redirect: every login lands on home)
   useEffect(() => {
-    if (user && localStorage.getItem('rate-first-login') === 'true') {
-      localStorage.removeItem('rate-first-login');
-      setRedirectToProfile(true);
-      setTimeout(() => setRedirectToProfile(false), 100);
-    }
+    if (user) localStorage.removeItem('rate-first-login');
   }, [user]);
 
   const persist = useCallback((updated: Financing[]) => {
@@ -106,7 +101,6 @@ function AppContent() {
 
   return (
     <BrowserRouter>
-      {redirectToProfile && <Navigate to="/profilo" replace />}
       <Routes>
         <Route
           path="/"
