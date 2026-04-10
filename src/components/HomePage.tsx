@@ -918,7 +918,7 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                         navigate(`/detail/${f.id}`);
                       }}
                       className="riepilogo-icon-box"
-                      style={{ background: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '26px', height: '26px', boxSizing: 'border-box', lineHeight: 0, position: 'relative' }}
+                      style={{ background: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '26px', height: '26px', boxSizing: 'border-box', lineHeight: 0, position: 'relative', transform: 'translateY(0.5px)' }}
                       title="Apri dettaglio"
                     >
                       <AppsListDetail24Regular style={{ fontSize: 15, color: '#2ecc71', position: 'absolute', clipPath: 'inset(0 0 50% 0)' }} />
