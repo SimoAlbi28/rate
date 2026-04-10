@@ -678,7 +678,7 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
               {showSortMenu && (
                 <>
                   <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setShowSortMenu(false)} />
-                  <div style={{ position: 'absolute', top: '110%', left: 0, background: 'white', borderRadius: '0.75rem', boxShadow: '0 4px 20px rgba(0,0,0,0.15)', border: '1px solid #e0e0e0', zIndex: 100, minWidth: '200px', overflow: 'hidden' }}>
+                  <div className="sort-dropdown-menu" style={{ position: 'absolute', top: '110%', left: 0, background: 'white', borderRadius: '0.75rem', boxShadow: '0 4px 20px rgba(0,0,0,0.15)', border: '1px solid #e0e0e0', zIndex: 100, minWidth: '200px', overflow: 'hidden' }}>
                     {([
                       { key: 'default' as const, label: 'Predefinito (A-Z)' },
                       { key: 'progress-desc' as const, label: 'Più vicini al completamento' },
@@ -918,7 +918,7 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                         navigate(`/detail/${f.id}`);
                       }}
                       className="riepilogo-icon-box"
-                      style={{ background: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '26px', height: '26px', boxSizing: 'border-box', lineHeight: 0, position: 'relative', transform: 'translateY(1.5px)' }}
+                      style={{ background: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '26px', height: '26px', boxSizing: 'border-box', lineHeight: 0, position: 'relative', transform: (f.rateMode || 'variabile') === 'variabile' ? 'translateY(0.5px)' : 'translateY(0.5px)' }}
                       title="Apri dettaglio"
                     >
                       <AppsListDetail24Regular style={{ fontSize: 15, color: '#2ecc71', position: 'absolute', clipPath: 'inset(0 0 50% 0)' }} />
@@ -929,7 +929,7 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                 {expandedCards.has(f.id) && (<>
                 <hr className="card-separator" />
                 {formatPeriod() && <div className="card-period-center">{formatPeriod()}</div>}
-                <div className="card-info-center" style={{ color: '#333' }}>Rate mancanti: {remainingMonths > 0 ? remainingMonths : 0} su {f.totalMonths}</div>
+                <div className="card-info-center" style={{ color: 'var(--theme-text-primary, #333)' }}>Rate mancanti: {remainingMonths > 0 ? remainingMonths : 0} su {f.totalMonths}</div>
                 <hr className="card-separator" />
                 <div className="card-info-table">
                   {(() => {
@@ -1406,12 +1406,10 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                         value={startDate}
                         onChange={(e) => handleStartDateChange(e.target.value)}
                         onInput={(e) => { const val = (e.target as HTMLInputElement).value; if (val !== startDate) handleStartDateChange(val); }}
-                        style={!startDate ? { color: 'transparent' } : {}}
                       />
                       {startDate && (
                         <button type="button" onClick={() => handleStartDateChange('')} style={{ position: 'absolute', right: '0.4rem', top: '50%', transform: 'translateY(-50%)', background: '#c0392b', border: 'none', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 }}><X size={10} color="white" /></button>
                       )}
-                      {!startDate && <span style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999', fontSize: '0.9rem', pointerEvents: 'none' }}>Data</span>}
                     </div>
                   </div>
                   <div className="date-field">
@@ -1422,12 +1420,10 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                         value={endDate}
                         onChange={(e) => handleEndDateChange(e.target.value)}
                         onInput={(e) => { const val = (e.target as HTMLInputElement).value; if (val !== endDate) handleEndDateChange(val); }}
-                        style={!endDate ? { color: 'transparent' } : {}}
                       />
                       {endDate && (
                         <button type="button" onClick={() => handleEndDateChange('')} style={{ position: 'absolute', right: '0.4rem', top: '50%', transform: 'translateY(-50%)', background: '#c0392b', border: 'none', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 }}><X size={10} color="white" /></button>
                       )}
-                      {!endDate && <span style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999', fontSize: '0.9rem', pointerEvents: 'none' }}>Data</span>}
                     </div>
                   </div>
                 </div>
@@ -1683,12 +1679,10 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                         value={editStartDate}
                         onChange={(e) => handleEditStartDate(e.target.value)}
                         onInput={(e) => { const val = (e.target as HTMLInputElement).value; if (val !== editStartDate) handleEditStartDate(val); }}
-                        style={!editStartDate ? { color: 'transparent' } : {}}
                       />
                       {editStartDate && (
                         <button type="button" onClick={() => handleEditStartDate('')} style={{ position: 'absolute', right: '0.4rem', top: '50%', transform: 'translateY(-50%)', background: '#c0392b', border: 'none', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 }}><X size={10} color="white" /></button>
                       )}
-                      {!editStartDate && <span style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999', fontSize: '0.9rem', pointerEvents: 'none' }}>Data</span>}
                     </div>
                   </div>
                   <div className="date-field">
@@ -1699,12 +1693,10 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                         value={editEndDate}
                         onChange={(e) => handleEditEndDate(e.target.value)}
                         onInput={(e) => { const val = (e.target as HTMLInputElement).value; if (val !== editEndDate) handleEditEndDate(val); }}
-                        style={!editEndDate ? { color: 'transparent' } : {}}
                       />
                       {editEndDate && (
                         <button type="button" onClick={() => handleEditEndDate('')} style={{ position: 'absolute', right: '0.4rem', top: '50%', transform: 'translateY(-50%)', background: '#c0392b', border: 'none', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 }}><X size={10} color="white" /></button>
                       )}
-                      {!editEndDate && <span style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999', fontSize: '0.9rem', pointerEvents: 'none' }}>Data</span>}
                     </div>
                   </div>
                 </div>

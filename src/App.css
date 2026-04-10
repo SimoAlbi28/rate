@@ -70,6 +70,38 @@ html[data-theme="dark"] .toolbar-btn-create {
   color: white !important;
 }
 
+/* Trash btn nella cronologia: sempre rosso, anche in dark mode */
+html[data-theme="dark"] .toolbar-btn.crono-trash-btn {
+  background: #c0392b !important;
+  border-color: #c0392b !important;
+  color: white !important;
+}
+html[data-theme="dark"] .toolbar-btn.crono-trash-btn svg {
+  color: white !important;
+}
+
+/* In modalità selezione: sfondo bianco, bordo + icona rossi (sia chiaro che scuro) */
+.toolbar-btn.crono-trash-btn-active,
+html[data-theme="dark"] .toolbar-btn.crono-trash-btn-active {
+  background: white !important;
+  border-color: #c0392b !important;
+  color: #c0392b !important;
+}
+.toolbar-btn.crono-trash-btn-active svg,
+html[data-theme="dark"] .toolbar-btn.crono-trash-btn-active svg {
+  color: #c0392b !important;
+}
+
+/* Dropdown sort menu in dark mode */
+html[data-theme="dark"] .sort-dropdown-menu {
+  background: var(--theme-bg-card) !important;
+  border-color: rgba(255,255,255,0.22) !important;
+}
+html[data-theme="dark"] .sort-dropdown-menu button {
+  color: var(--theme-text-primary) !important;
+  border-bottom-color: rgba(255,255,255,0.1) !important;
+}
+
 html[data-theme="dark"] .sticky-bar::after {
   background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.35) 10%, rgba(255,255,255,0.35) 90%, transparent 100%) !important;
 }
@@ -79,10 +111,34 @@ html[data-theme="dark"] .card.financing-card {
   background: var(--theme-bg-card) !important;
   color: var(--theme-text-primary);
   box-shadow: var(--theme-card-shadow);
+  border: 1px solid rgba(255, 255, 255, 0.22) !important;
 }
 
 html[data-theme="dark"] .card.financing-card .card-info-center {
   color: var(--theme-text-primary);
+}
+
+/* Storico pagamenti righe in dark mode */
+html[data-theme="dark"] .payment-item {
+  background: #242424 !important;
+  color: var(--theme-text-primary) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+}
+html[data-theme="dark"] .payment-amount,
+html[data-theme="dark"] .payment-col-amount {
+  color: var(--theme-text-primary) !important;
+}
+html[data-theme="dark"] .payment-col-date {
+  color: #a8cdb3 !important;
+}
+html[data-theme="dark"] .payment-col-date::after,
+html[data-theme="dark"] .payment-col-amount::after,
+html[data-theme="dark"] .payment-col-note::after,
+html[data-theme="dark"] .payment-header .payment-col-date::after,
+html[data-theme="dark"] .payment-header .payment-col-amount::after,
+html[data-theme="dark"] .payment-header .payment-col-note::after {
+  background: rgba(255, 255, 255, 0.18) !important;
+  border-color: rgba(255, 255, 255, 0.18) !important;
 }
 /* Default color for .card-info but only when no semantic variant is present */
 html[data-theme="dark"] .card.financing-card .card-info:not(.card-info-red):not(.card-info-green):not(.card-info-yellow) {
@@ -107,6 +163,10 @@ html[data-theme="dark"] .card.section-card label,
 html[data-theme="dark"] .card.section-card .section-heading,
 html[data-theme="dark"] .detail-riepilogo-bar .section-heading {
   color: var(--theme-text-primary) !important;
+}
+
+html[data-theme="dark"] .detail-riepilogo-bar {
+  border: 1px solid rgba(255, 255, 255, 0.22) !important;
 }
 
 
@@ -860,7 +920,7 @@ select {
 .cards-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 1rem;
+  gap: 2.2rem;
   animation: border-rotate 6s linear infinite;
 }
 
@@ -868,6 +928,23 @@ select {
   position: relative;
   margin-bottom: 0;
   padding-bottom: 1rem;
+}
+
+/* Linea tratteggiata di separazione tra le card della home, sfumata ai lati */
+.cards-grid > *:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1.1rem;
+  height: 0;
+  border-bottom: 1.5px dashed #000;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 18%, #000 82%, transparent 100%);
+          mask-image: linear-gradient(90deg, transparent 0%, #000 18%, #000 82%, transparent 100%);
+}
+html[data-theme="dark"] .cards-grid > *:not(:last-child)::after {
+  border-bottom-color: #ffffff;
 }
 
 @media (min-width: 400px) {
@@ -903,6 +980,10 @@ select {
   mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   mask-composite: exclude;
   pointer-events: none;
+}
+
+html[data-theme="dark"] .financing-card::before {
+  background: conic-gradient(from var(--border-angle), #ffffff 0deg, #ffffff 250deg, rgba(255,255,255,0.25) 290deg, rgba(255,255,255,0.25) 320deg, #ffffff 360deg);
 }
 
 @property --border-angle {
@@ -1214,6 +1295,33 @@ select {
 @keyframes fadeInScale {
   from { opacity: 0; transform: scale(0.9); }
   to { opacity: 1; transform: scale(1); }
+}
+
+/* Shine effect su bottoni: 2 strisce bianche simultanee che scivolano */
+.btn-shine {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.btn-shine::before,
+.btn-shine::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -60%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(115deg, transparent 0%, rgba(255,255,255,0.35) 50%, transparent 100%);
+  transform: skewX(-20deg);
+  animation: btn-shine-sweep 3.5s linear infinite;
+  pointer-events: none;
+}
+.btn-shine::before {
+  animation-delay: -1.75s; /* metà del ciclo, così è sempre opposta all'altra */
+}
+@keyframes btn-shine-sweep {
+  0%   { left: -60%; }
+  100% { left: 160%; }
 }
 
 .profile-menu-item {
@@ -2135,7 +2243,7 @@ select {
   align-items: center;
   justify-content: center;
   z-index: 100;
-  padding: 1rem;
+  padding: 1rem 1rem calc(80px + env(safe-area-inset-bottom, 0px)) 1rem;
 }
 
 .modal {
@@ -2144,9 +2252,15 @@ select {
   padding: 1.5rem;
   width: 100%;
   max-width: 360px;
-  max-height: 90vh;
+  max-height: calc(100vh - 100px - env(safe-area-inset-bottom, 0px));
   overflow-y: auto;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+}
+
+.modal h2,
+.modal .modal-title {
+  text-align: center !important;
+  margin-bottom: 1rem;
 }
 
 .modal h3 {
@@ -2385,6 +2499,7 @@ select {
 
 .emoji-btn.selected {
   border-color: #4a8c5c;
+  background: #d4f5dc;
   transform: scale(1.15);
 }
 

@@ -73,6 +73,7 @@ export default function DetailPage({ financings, onUpdate }: Props) {
   const [editInt, setEditInt] = useState('');
   const [editDec, setEditDec] = useState('');
   const [editNote, setEditNote] = useState('');
+  const editOriginal = useRef<{ date: string; int: string; dec: string; note: string } | null>(null);
   const [swipeX, setSwipeX] = useState(0);
   const [swiping, setSwiping] = useState(false);
   const [swipeOut, setSwipeOut] = useState(false);
@@ -272,12 +273,32 @@ export default function DetailPage({ financings, onUpdate }: Props) {
   const openEditPayment = (p: Payment) => {
     setEditingPayment(p.id);
     const d = new Date(p.date);
-    setEditDate(d.toISOString().split('T')[0]);
-    setEditInt(Math.floor(p.amount).toString());
+    const dateStr = d.toISOString().split('T')[0];
+    const intStr = Math.floor(p.amount).toString();
     const dec = Math.round((p.amount - Math.floor(p.amount)) * 100);
-    setEditDec(dec > 0 ? dec.toString() : '');
-    setEditNote(p.note || '');
+    const decStr = dec > 0 ? dec.toString() : '';
+    const noteStr = p.note || '';
+    setEditDate(dateStr);
+    setEditInt(intStr);
+    setEditDec(decStr);
+    setEditNote(noteStr);
+    editOriginal.current = { date: dateStr, int: intStr, dec: decStr, note: noteStr };
   };
+
+  const editHasChanges = editingPayment !== null && editOriginal.current !== null && (
+    editDate !== editOriginal.current.date ||
+    editInt !== editOriginal.current.int ||
+    editDec !== editOriginal.current.dec ||
+    editNote !== editOriginal.current.note
+  );
+
+  // Lock body scroll while the edit-payment modal is open
+  useEffect(() => {
+    if (!editingPayment) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, [editingPayment]);
 
   const saveEditPayment = () => {
     if (!editingPayment) return;
@@ -1091,7 +1112,7 @@ export default function DetailPage({ financings, onUpdate }: Props) {
       </div>
 
       {editingPayment && createPortal(
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999 }} onClick={() => setEditingPayment(null)}>
+        <div className="modal-overlay" style={{ zIndex: 99999 }} onClick={() => setEditingPayment(null)}>
           <div className="modal" style={{ maxWidth: '360px' }} onClick={(e) => e.stopPropagation()}>
             <h2 className="modal-title">Modifica pagamento</h2>
             <p className="modal-field-label">Data</p>
@@ -1143,7 +1164,14 @@ export default function DetailPage({ financings, onUpdate }: Props) {
             )}
             <div className="modal-actions">
               <button className="btn-secondary" onClick={() => setEditingPayment(null)}>Annulla</button>
-              <button className="btn-primary" onClick={saveEditPayment}>Salva</button>
+              <button
+                className="btn-primary"
+                onClick={saveEditPayment}
+                disabled={!editHasChanges}
+                style={!editHasChanges ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+              >
+                Salva
+              </button>
             </div>
           </div>
         </div>,

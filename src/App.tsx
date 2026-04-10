@@ -43,6 +43,30 @@ function AppContent() {
     if (user) localStorage.removeItem('rate-first-login');
   }, [user]);
 
+  // Auto theme: re-evaluate every minute, on focus and on visibilitychange so
+  // the dark/light switch happens regardless of which page is mounted.
+  useEffect(() => {
+    const apply = () => {
+      const mode = localStorage.getItem('settings-theme') || 'auto';
+      const now = new Date();
+      const minutes = now.getHours() * 60 + now.getMinutes();
+      // Dark dalle 20:00 alle 06:00
+      const isDarkHour = minutes >= 20 * 60 || minutes < 6 * 60;
+      const dark = mode === 'dark' || (mode === 'auto' && isDarkHour);
+      if (dark) document.documentElement.setAttribute('data-theme', 'dark');
+      else if (mode === 'light' || (mode === 'auto' && !isDarkHour)) document.documentElement.removeAttribute('data-theme');
+    };
+    apply();
+    const interval = window.setInterval(apply, 30_000); // ogni 30s
+    window.addEventListener('focus', apply);
+    document.addEventListener('visibilitychange', apply);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', apply);
+      document.removeEventListener('visibilitychange', apply);
+    };
+  }, []);
+
   const persist = useCallback((updated: Financing[]) => {
     setFinancings(updated);
     saveFinancings(updated);

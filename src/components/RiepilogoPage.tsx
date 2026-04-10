@@ -73,11 +73,6 @@ export default function RiepilogoPage({ financings }: Props) {
   const rataMedieGlobale = totalRatePagate > 0 ? totalePagato / totalRatePagate : 0;
   const totalePagamenti = financings.reduce((s, f) => s + f.payments.length, 0);
 
-  // Prossima scadenza
-  const prossimaScadenza = financings
-    .filter(f => f.endDate && !isCompleted(f))
-    .sort((a, b) => new Date(a.endDate).getTime() - new Date(b.endDate).getTime())[0];
-
   // Finanziamento piu grande e piu piccolo
   const piuGrande = financings.length > 0 ? financings.reduce((max, f) => f.totalAmount > max.totalAmount ? f : max) : null;
   const piuPiccolo = financings.length > 0 ? financings.reduce((min, f) => f.totalAmount < min.totalAmount ? f : min) : null;
@@ -269,28 +264,22 @@ export default function RiepilogoPage({ financings }: Props) {
             {piuGrande && (
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', borderBottom: '1px solid #eee' }}>
                 <span style={{ fontSize: '0.8rem', color: 'var(--theme-text-secondary, #666)' }}>Finanziamento più grande</span>
-                <span style={{ fontSize: '0.8rem', fontWeight: '600', color: '#333' }}>{piuGrande.emoji} {piuGrande.name} ({piuGrande.totalAmount.toFixed(2)} €)</span>
+                <span style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--theme-text-primary, #333)' }}>{piuGrande.emoji} {piuGrande.name} ({piuGrande.totalAmount.toFixed(2)} €)</span>
               </div>
             )}
             {piuPiccolo && piuPiccolo.id !== piuGrande?.id && (
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', borderBottom: '1px solid #eee' }}>
                 <span style={{ fontSize: '0.8rem', color: 'var(--theme-text-secondary, #666)' }}>Finanziamento più piccolo</span>
-                <span style={{ fontSize: '0.8rem', fontWeight: '600', color: '#333' }}>{piuPiccolo.emoji} {piuPiccolo.name} ({piuPiccolo.totalAmount.toFixed(2)} €)</span>
-              </div>
-            )}
-            {prossimaScadenza && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', borderBottom: '1px solid #eee' }}>
-                <span style={{ fontSize: '0.8rem', color: 'var(--theme-text-secondary, #666)' }}>Prossima scadenza</span>
-                <span style={{ fontSize: '0.8rem', fontWeight: '600', color: '#e67e22' }}>{prossimaScadenza.emoji} {prossimaScadenza.name} ({new Date(prossimaScadenza.endDate).toLocaleDateString('it-IT')})</span>
+                <span style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--theme-text-primary, #333)' }}>{piuPiccolo.emoji} {piuPiccolo.name} ({piuPiccolo.totalAmount.toFixed(2)} €)</span>
               </div>
             )}
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', borderBottom: '1px solid #eee' }}>
               <span style={{ fontSize: '0.8rem', color: 'var(--theme-text-secondary, #666)' }}>Importo medio per cartella</span>
-              <span style={{ fontSize: '0.8rem', fontWeight: '600', color: '#333' }}>{totaleFinanziamenti > 0 ? fmtEuro(totaleDaPagare / totaleFinanziamenti) : '- €'}</span>
+              <span style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--theme-text-primary, #333)' }}>{totaleFinanziamenti > 0 ? fmtEuro(totaleDaPagare / totaleFinanziamenti) : '- €'}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0' }}>
               <span style={{ fontSize: '0.8rem', color: 'var(--theme-text-secondary, #666)' }}>Rate medie per cartella</span>
-              <span style={{ fontSize: '0.8rem', fontWeight: '600', color: '#333' }}>{totaleFinanziamenti > 0 ? (totalRateTotali / totaleFinanziamenti).toFixed(1) : '-'}</span>
+              <span style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--theme-text-primary, #333)' }}>{totaleFinanziamenti > 0 ? (totalRateTotali / totaleFinanziamenti).toFixed(1) : '-'}</span>
             </div>
           </div>
         </div>
@@ -303,7 +292,22 @@ export default function RiepilogoPage({ financings }: Props) {
             <p style={{ textAlign: 'center', color: '#999', fontSize: '0.85rem', padding: '1rem 0' }}>Nessun finanziamento</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
-              {financings.map(f => {
+              {(() => {
+                const sortMode = localStorage.getItem('sortMode') || 'default';
+                const progressOf = (f: Financing) => {
+                  const paid = getPaid(f);
+                  return f.totalAmount > 0 ? (paid / f.totalAmount) * 100 : 0;
+                };
+                const sorted = [...financings];
+                if (sortMode === 'progress-desc') {
+                  sorted.sort((a, b) => progressOf(b) - progressOf(a));
+                } else if (sortMode === 'progress-asc') {
+                  sorted.sort((a, b) => progressOf(a) - progressOf(b));
+                } else {
+                  sorted.sort((a, b) => a.name.localeCompare(b.name, 'it', { sensitivity: 'base' }));
+                }
+                return sorted;
+              })().map(f => {
                 const paid = getPaid(f);
                 const rest = Math.max(f.totalAmount - paid, 0);
                 const ratePagate = getRatePagate(f);

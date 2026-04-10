@@ -212,7 +212,7 @@ export default function CronologiaPage({ financings }: Props) {
               {showSortMenu && (
                 <>
                   <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setShowSortMenu(false)} />
-                  <div style={{ position: 'absolute', top: '110%', left: 0, background: 'white', borderRadius: '0.75rem', boxShadow: '0 4px 20px rgba(0,0,0,0.15)', border: '1px solid #e0e0e0', zIndex: 100, minWidth: '210px', overflow: 'hidden' }}>
+                  <div className="sort-dropdown-menu" style={{ position: 'absolute', top: '110%', left: 0, background: 'white', borderRadius: '0.75rem', boxShadow: '0 4px 20px rgba(0,0,0,0.15)', border: '1px solid #e0e0e0', zIndex: 100, minWidth: '210px', overflow: 'hidden' }}>
                     {(Object.keys(sortLabels) as SortMode[]).map((key) => (
                       <button
                         key={key}
@@ -249,7 +249,7 @@ export default function CronologiaPage({ financings }: Props) {
             )}
             {visibleRows.length > 0 && (
               <button
-                className="toolbar-btn"
+                className={`toolbar-btn crono-trash-btn ${selectionMode ? 'crono-trash-btn-active' : ''}`}
                 onClick={toggleSelectionMode}
                 style={{ position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: selectionMode ? 'white' : '#c0392b', borderColor: '#c0392b', color: selectionMode ? '#c0392b' : 'white', width: 46, height: 42, padding: 0, boxSizing: 'border-box' }}
                 title={selectionMode ? 'Annulla selezione' : 'Seleziona notifiche da rimuovere'}

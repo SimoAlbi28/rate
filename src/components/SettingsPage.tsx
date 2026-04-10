@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Download, Moon, Sun, Cloud, CloudOff, Send, Info, SunMoon, ClipboardCopy, Check } from 'lucide-react';
+import { Moon, Sun, Cloud, CloudOff, Send, Info, SunMoon, Check } from 'lucide-react';
 import type { Financing } from '../types';
 import { exportAllFinancings, getLastSyncISO, getLastSyncError } from '../storage';
 import { useAuth } from '../AuthContext';
@@ -37,22 +37,22 @@ export default function SettingsPage({ financings }: Props) {
   const profileIcon = localStorage.getItem('profileIcon') || '👤';
   const profileColor = localStorage.getItem('profileColor') || '#3498db';
 
-  // Home preferences
+  // Home preferences (default applied on next app reload)
   const [homeSort, setHomeSort] = useState<HomeSortMode>(() => {
-    const saved = localStorage.getItem('sortMode');
+    const saved = localStorage.getItem('sortMode-default');
     if (saved === 'progress-desc' || saved === 'progress-asc') return saved;
     return 'default';
   });
 
-  // Cronologia preferences
+  // Cronologia preferences (default applied on next app reload)
   const [cronoSort, setCronoSort] = useState<SortMode>(
-    () => (localStorage.getItem('cronologia-sort') as SortMode) || 'date'
+    () => (localStorage.getItem('cronologia-sort-default') as SortMode) || 'date'
   );
   const [cronoSeparators, setCronoSeparators] = useState<boolean>(
     () => localStorage.getItem('settings-cronologia-separators') !== '0'
   );
 
-  // Theme: 'light' | 'dark' | 'auto' (auto = dark dalle 19:00 alle 06:00)
+  // Theme: 'light' | 'dark' | 'auto' (auto = dark dalle 20:00 alle 06:00)
   type ThemeMode = 'light' | 'dark' | 'auto';
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
     const saved = localStorage.getItem('settings-theme');
@@ -61,8 +61,10 @@ export default function SettingsPage({ financings }: Props) {
   });
 
   const isDarkHour = () => {
-    const h = new Date().getHours();
-    return h >= 19 || h < 6;
+    const now = new Date();
+    const minutes = now.getHours() * 60 + now.getMinutes();
+    // Dark dalle 20:00 alle 06:00
+    return minutes >= 20 * 60 || minutes < 6 * 60;
   };
 
   useEffect(() => {
@@ -73,7 +75,7 @@ export default function SettingsPage({ financings }: Props) {
     } else {
       document.documentElement.removeAttribute('data-theme');
     }
-    // If auto, recheck every minute so the page switches at 19:00 / 06:00
+    // If auto, recheck every minute so the page switches at 20:00 / 06:00
     if (themeMode !== 'auto') return;
     const interval = window.setInterval(() => {
       const dark = isDarkHour();
@@ -85,14 +87,17 @@ export default function SettingsPage({ financings }: Props) {
 
   const darkMode = themeMode === 'dark' || (themeMode === 'auto' && isDarkHour());
 
+  // These write only to the *-default keys; on app reopen main.tsx copies them
+  // into the live keys (sortMode, cronologia-sort). This way changes here don't
+  // affect the active session in Home/Cronologia, and vice versa.
   const applyHomeSort = (m: HomeSortMode) => {
     setHomeSort(m);
-    localStorage.setItem('sortMode', m);
+    localStorage.setItem('sortMode-default', m);
   };
 
   const applyCronoSort = (m: SortMode) => {
     setCronoSort(m);
-    localStorage.setItem('cronologia-sort', m);
+    localStorage.setItem('cronologia-sort-default', m);
   };
 
   const applyCronoSeparators = (v: boolean) => {
@@ -241,6 +246,7 @@ export default function SettingsPage({ financings }: Props) {
           <button
             onClick={() => exportAllFinancings(financings)}
             disabled={financings.length === 0}
+            className={financings.length === 0 ? '' : 'btn-shine'}
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
               width: '100%', padding: '0.75rem', borderRadius: '0.5rem', border: 'none',
@@ -248,7 +254,7 @@ export default function SettingsPage({ financings }: Props) {
               fontWeight: 700, fontSize: '0.9rem', cursor: financings.length === 0 ? 'not-allowed' : 'pointer',
             }}
           >
-            <Download size={16} /> Scarica backup Excel
+            <span className="btn-excel-icon">X</span> Esporta in Excel
           </button>
           <p style={{ fontSize: '0.78rem', color: darkMode ? '#a8cdb3' : '#666', textAlign: 'center', margin: '0.75rem 0 0.5rem' }}>
             Oppure copia tutto come testo (per Word, Note, Whatsapp, ecc.):
@@ -256,6 +262,7 @@ export default function SettingsPage({ financings }: Props) {
           <button
             onClick={copyToClipboard}
             disabled={financings.length === 0}
+            className={financings.length === 0 ? '' : 'btn-shine'}
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
               width: '100%', padding: '0.75rem', borderRadius: '0.5rem', border: 'none',
@@ -265,7 +272,7 @@ export default function SettingsPage({ financings }: Props) {
               transition: 'background 0.2s',
             }}
           >
-            {copyState === 'ok' ? (<><Check size={16} /> Copiato!</>) : (<><ClipboardCopy size={16} /> Copia negli appunti</>)}
+            {copyState === 'ok' ? (<><Check size={16} /> Copiato!</>) : (<><span className="btn-excel-icon">📋</span> Copia dati</>)}
           </button>
           {copyState === 'error' && (
             <p style={{ fontSize: '0.7rem', color: '#c0392b', textAlign: 'center', margin: '0.4rem 0 0' }}>
@@ -277,6 +284,41 @@ export default function SettingsPage({ financings }: Props) {
               Nessun finanziamento da esportare.
             </p>
           )}
+        </div>
+
+        {/* SEZIONE: ASPETTO */}
+        <div className="card section-card">
+          <h3 className="section-heading" style={{ textAlign: 'center', marginBottom: '0.25rem' }}>🎨 Aspetto</h3>
+          <hr className="card-separator" />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginTop: '0.5rem' }}>
+            {([
+              { key: 'light' as const, icon: <Sun size={16} />, label: 'Tema chiaro' },
+              { key: 'dark' as const, icon: <Moon size={16} />, label: 'Tema scuro' },
+              { key: 'auto' as const, icon: <SunMoon size={16} />, label: 'Auto' },
+            ]).map((opt) => {
+              const active = themeMode === opt.key;
+              return (
+                <button
+                  key={opt.key}
+                  onClick={() => setThemeMode(opt.key)}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', padding: '0.55rem 0.75rem',
+                    border: `1.5px solid ${active ? '#27ae60' : (darkMode ? 'rgba(255,255,255,0.2)' : '#e0e0e0')}`,
+                    borderRadius: '0.5rem', cursor: 'pointer',
+                    background: active ? '#eafaf1' : 'transparent',
+                    fontSize: '0.85rem', fontWeight: active ? 700 : 500,
+                    color: active ? '#1e8449' : (darkMode ? '#e8f5ea' : '#333'),
+                    textAlign: 'center', transition: 'all 0.15s',
+                  }}
+                >
+                  {opt.icon} {opt.label}
+                </button>
+              );
+            })}
+          </div>
+          <p style={{ fontSize: '0.7rem', color: darkMode ? '#a8cdb3' : '#999', textAlign: 'center', margin: '0.5rem 0 0', fontStyle: 'italic', lineHeight: 1.4 }}>
+            Auto: tema chiaro di giorno, scuro dalle 20:00 alle 06:00 per non affaticare gli occhi.
+          </p>
         </div>
 
         {/* SEZIONE: HOME / CARTELLE */}
@@ -376,41 +418,6 @@ export default function SettingsPage({ financings }: Props) {
               Crea un account per sincronizzare i dati sul cloud.
             </p>
           )}
-        </div>
-
-        {/* SEZIONE: ASPETTO */}
-        <div className="card section-card">
-          <h3 className="section-heading" style={{ textAlign: 'center', marginBottom: '0.25rem' }}>🎨 Aspetto</h3>
-          <hr className="card-separator" />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginTop: '0.5rem' }}>
-            {([
-              { key: 'light' as const, icon: <Sun size={16} />, label: 'Tema chiaro' },
-              { key: 'dark' as const, icon: <Moon size={16} />, label: 'Tema scuro' },
-              { key: 'auto' as const, icon: <SunMoon size={16} />, label: 'Auto' },
-            ]).map((opt) => {
-              const active = themeMode === opt.key;
-              return (
-                <button
-                  key={opt.key}
-                  onClick={() => setThemeMode(opt.key)}
-                  style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', padding: '0.55rem 0.75rem',
-                    border: `1.5px solid ${active ? '#27ae60' : (darkMode ? 'rgba(255,255,255,0.2)' : '#e0e0e0')}`,
-                    borderRadius: '0.5rem', cursor: 'pointer',
-                    background: active ? '#eafaf1' : 'transparent',
-                    fontSize: '0.85rem', fontWeight: active ? 700 : 500,
-                    color: active ? '#1e8449' : (darkMode ? '#e8f5ea' : '#333'),
-                    textAlign: 'center', transition: 'all 0.15s',
-                  }}
-                >
-                  {opt.icon} {opt.label}
-                </button>
-              );
-            })}
-          </div>
-          <p style={{ fontSize: '0.7rem', color: darkMode ? '#a8cdb3' : '#999', textAlign: 'center', margin: '0.5rem 0 0', fontStyle: 'italic', lineHeight: 1.4 }}>
-            Auto: tema chiaro di giorno, scuro dalle 19:00 alle 06:00 per non affaticare gli occhi.
-          </p>
         </div>
 
         {/* SEZIONE: FEEDBACK */}
