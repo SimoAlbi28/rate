@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, Search, X } from 'lucide-react';
 import { AppsListDetail24Regular } from '@fluentui/react-icons';
 import type { Financing, RateType, Payment } from '../types';
+import ProfileMenu from './ProfileMenu';
 
 interface Props {
   financings: Financing[];
@@ -599,6 +600,7 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
             <span>{profileIcon}</span>
           </button>
         </nav>
+        {showProfileMenu && <ProfileMenu onClose={() => setShowProfileMenu(false)} />}
 
         {showProfile && (
           <div className="modal-overlay" onClick={() => { setProfileIcon(tempProfileIcon); setProfileColor(tempProfileColor); setShowProfile(false); }}>
@@ -1491,7 +1493,7 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                     </div>
                   ))}
                 </div>
-                <p className="modal-field-label">Totale pagato</p>
+                <p className="modal-field-label" style={{ fontSize: '1rem', color: '#1e8449', fontWeight: 800, letterSpacing: '0.5px' }}>Totale pagato</p>
                 <div className="amount-row" style={{ opacity: 0.5, pointerEvents: 'none' }}>
                   <input type="number" placeholder="Euro" value={initialPaidInt} disabled />
                   <span className="amount-sep">,</span>

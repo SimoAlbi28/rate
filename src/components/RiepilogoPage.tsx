@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Financing } from '../types';
+import ProfileMenu from './ProfileMenu';
 
 interface Props {
   financings: Financing[];
@@ -7,6 +9,7 @@ interface Props {
 
 export default function RiepilogoPage({ financings }: Props) {
   const navigate = useNavigate();
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   const fmtEuro = (v: number) => v <= 0.004 ? '- €' : `${v.toFixed(2)} €`;
 
@@ -101,10 +104,11 @@ export default function RiepilogoPage({ financings }: Props) {
             <h1>Rate & Pagamenti</h1>
             <p className="navbar-tagline">Tutto quello che devi pagare, qui.</p>
           </div>
-          <button className="navbar-profile" style={{ background: localStorage.getItem('profileColor') || '#3498db' }}>
+          <button className="navbar-profile" style={{ background: localStorage.getItem('profileColor') || '#3498db' }} onClick={() => setShowProfileMenu(!showProfileMenu)}>
             <span>{localStorage.getItem('profileIcon') || '👤'}</span>
           </button>
         </nav>
+        {showProfileMenu && <ProfileMenu onClose={() => setShowProfileMenu(false)} />}
         <div className="sticky-bar">
           <h2 style={{ textAlign: 'center', fontSize: '1.1rem', fontWeight: 'bold', color: '#333', letterSpacing: '2px', textTransform: 'uppercase' }}>Panoramica Generale</h2>
         </div>

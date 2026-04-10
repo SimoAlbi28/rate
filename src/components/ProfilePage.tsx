@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Pencil, Check, X, LogOut } from 'lucide-react';
+import { Eye, EyeOff, Pencil, Check, X, LogOut, LogIn } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 import { supabase } from '../supabaseClient';
+import ProfileMenu from './ProfileMenu';
 
 const PROFILE_ICONS = [
   '👤', '👩', '👨', '🧑', '👧', '👦', '🧔', '👩‍💼', '👨‍💼', '🧑‍💻',
@@ -42,11 +43,22 @@ export default function ProfilePage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Profile data from localStorage
-  const [nome, setNome] = useState(() => localStorage.getItem('profile-nome') || '');
-  const [cognome, setCognome] = useState(() => localStorage.getItem('profile-cognome') || '');
-  const [pIcon, setPIcon] = useState(() => localStorage.getItem('profileIcon') || '👤');
-  const [pColor, setPColor] = useState(() => localStorage.getItem('profileColor') || '#3498db');
+  // Profile data: source of truth is user_metadata, localStorage is a cache
+  const meta = (user?.user_metadata || {}) as Record<string, string | undefined>;
+  const [nome, setNome] = useState(() => meta.nome || localStorage.getItem('profile-nome') || '');
+  const [cognome, setCognome] = useState(() => meta.cognome || localStorage.getItem('profile-cognome') || '');
+  const [pIcon, setPIcon] = useState(() => meta.profileIcon || localStorage.getItem('profileIcon') || '👤');
+  const [pColor, setPColor] = useState(() => meta.profileColor || localStorage.getItem('profileColor') || '#3498db');
+
+  // Sync user_metadata into localStorage cache so other components stay in sync
+  useEffect(() => {
+    if (!user) return;
+    const m = (user.user_metadata || {}) as Record<string, string | undefined>;
+    if (m.nome) { localStorage.setItem('profile-nome', m.nome); setNome(m.nome); }
+    if (m.cognome) { localStorage.setItem('profile-cognome', m.cognome); setCognome(m.cognome); }
+    if (m.profileIcon) { localStorage.setItem('profileIcon', m.profileIcon); setPIcon(m.profileIcon); }
+    if (m.profileColor) { localStorage.setItem('profileColor', m.profileColor); setPColor(m.profileColor); }
+  }, [user]);
   const profileIcon = pIcon;
   const profileColor = pColor;
 
@@ -75,10 +87,12 @@ export default function ProfilePage() {
     if (field === 'nome') {
       setNome(editValue);
       localStorage.setItem('profile-nome', editValue);
+      if (user) await supabase.auth.updateUser({ data: { nome: editValue } });
       setSuccess('Nome aggiornato');
     } else if (field === 'cognome') {
       setCognome(editValue);
       localStorage.setItem('profile-cognome', editValue);
+      if (user) await supabase.auth.updateUser({ data: { cognome: editValue } });
       setSuccess('Cognome aggiornato');
     } else if (field === 'email') {
       if (!user) { setError('Devi avere un account per modificare la email'); return; }
@@ -161,6 +175,7 @@ export default function ProfilePage() {
             <span>{profileIcon}</span>
           </button>
         </nav>
+        {showProfileMenu && <ProfileMenu onClose={() => setShowProfileMenu(false)} variant="settings-only" />}
         <div className="sticky-bar">
           <h2 style={{ textAlign: 'center', fontSize: '1.1rem', fontWeight: 'bold', color: '#333', letterSpacing: '2px', textTransform: 'uppercase' }}>Profilo</h2>
         </div>
@@ -230,7 +245,7 @@ export default function ProfilePage() {
               </div>
               <div className="profile-modal-actions">
                 <button className="profile-btn-back" onClick={() => { setPIcon(localStorage.getItem('profileIcon') || '👤'); setPColor(localStorage.getItem('profileColor') || '#3498db'); setShowIconEditor(false); }}>Indietro</button>
-                <button className="profile-btn-save" onClick={() => { localStorage.setItem('profileIcon', pIcon); localStorage.setItem('profileColor', pColor); setShowIconEditor(false); }}>Salva</button>
+                <button className="profile-btn-save" onClick={async () => { localStorage.setItem('profileIcon', pIcon); localStorage.setItem('profileColor', pColor); if (user) await supabase.auth.updateUser({ data: { profileIcon: pIcon, profileColor: pColor } }); setShowIconEditor(false); }}>Salva</button>
               </div>
             </div>
           </div>
@@ -281,39 +296,12 @@ export default function ProfilePage() {
 
         <button
           onClick={() => signOut()}
-          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', width: '100%', padding: '0.75rem', marginTop: '1rem', borderRadius: '0.75rem', border: '1.5px solid #e74c3c', background: 'white', color: '#e74c3c', fontWeight: '600', fontSize: '0.9rem', cursor: 'pointer' }}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', width: '100%', padding: '0.75rem', marginTop: '1rem', borderRadius: '0.75rem', border: `1.5px solid ${isGuest ? '#3498db' : '#e74c3c'}`, background: 'white', color: isGuest ? '#3498db' : '#e74c3c', fontWeight: '600', fontSize: '0.9rem', cursor: 'pointer' }}
         >
-          <LogOut size={16} /> Logout
+          {isGuest ? <><LogIn size={16} /> Login</> : <><LogOut size={16} /> Logout</>}
         </button>
       </div>
 
-      {showProfileMenu && (
-        <>
-          <div style={{ position: 'fixed', inset: 0, zIndex: 9998 }} onClick={() => setShowProfileMenu(false)} />
-          <div style={{ position: 'fixed', top: '60px', right: '1rem', background: 'white', borderRadius: '0.75rem', boxShadow: '0 4px 20px rgba(0,0,0,0.15)', zIndex: 9999, minWidth: '160px', overflow: 'hidden' }}>
-            <button
-              onClick={() => { setShowProfileMenu(false); }}
-              style={{ width: '100%', padding: '0.7rem 1rem', border: 'none', background: 'none', textAlign: 'center', fontSize: '0.85rem', cursor: 'pointer', color: '#333', fontWeight: '500', borderBottom: '1px solid #eee' }}
-            >
-              Profilo
-            </button>
-            {isGuest && (
-              <button
-                onClick={() => { setShowProfileMenu(false); signOut(); }}
-                style={{ width: '100%', padding: '0.7rem 1rem', border: 'none', background: 'none', textAlign: 'center', fontSize: '0.85rem', cursor: 'pointer', color: '#3498db', fontWeight: '500', borderBottom: '1px solid #eee' }}
-              >
-                Login
-              </button>
-            )}
-            <button
-              onClick={() => { setShowProfileMenu(false); signOut(); }}
-              style={{ width: '100%', padding: '0.7rem 1rem', border: 'none', background: 'none', textAlign: 'center', fontSize: '0.85rem', cursor: 'pointer', color: '#e74c3c', fontWeight: '600' }}
-            >
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}><LogOut size={14} /> Logout</span>
-            </button>
-          </div>
-        </>
-      )}
     </div>
   );
 }

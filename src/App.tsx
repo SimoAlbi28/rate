@@ -9,6 +9,7 @@ import RiepilogoPage from './components/RiepilogoPage';
 import AuthPage from './components/AuthPage';
 import BottomNav from './components/BottomNav';
 import ProfilePage from './components/ProfilePage';
+import SettingsPage from './components/SettingsPage';
 import './App.css';
 
 function AppContent() {
@@ -126,6 +127,10 @@ function AppContent() {
         <Route
           path="/profilo"
           element={<ProfilePage />}
+        />
+        <Route
+          path="/impostazioni"
+          element={<SettingsPage />}
         />
         <Route
           path="/detail/:id"

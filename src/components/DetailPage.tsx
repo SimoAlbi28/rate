@@ -5,6 +5,7 @@ import * as XLSX from 'xlsx';
 import { Home } from 'lucide-react';
 import { AppsListDetail24Regular } from '@fluentui/react-icons';
 import type { Financing, Payment } from '../types';
+import ProfileMenu from './ProfileMenu';
 
 const PROFILE_ICONS = [
   '👤', '👩', '👨', '🧑', '👧', '👦', '🧔', '👩‍💼', '👨‍💼', '🧑‍💻',
@@ -73,6 +74,7 @@ export default function DetailPage({ financings, onUpdate }: Props) {
   const [profileIcon, setProfileIcon] = useState(localStorage.getItem('profileIcon') || '👤');
   const [profileColor, setProfileColor] = useState(localStorage.getItem('profileColor') || '#3498db');
   const [showProfile, setShowProfile] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [tempProfileIcon, setTempProfileIcon] = useState(profileIcon);
   const [tempProfileColor, setTempProfileColor] = useState(profileColor);
   const [showAllProfileIcons, setShowAllProfileIcons] = useState(false);
@@ -327,10 +329,11 @@ export default function DetailPage({ financings, onUpdate }: Props) {
             <h1 style={{ cursor: 'pointer' }} onClick={() => setShowSwitcher(!showSwitcher)}><span style={{ marginRight: '0.4rem', WebkitTextFillColor: 'initial', background: 'none', filter: 'none' }}>{financing.emoji}</span>{financing.name}</h1>
             <p className="navbar-tagline">FINANZIAMENTO</p>
           </div>
-          <button className="navbar-profile" style={{ background: profileColor }} onClick={() => { setTempProfileIcon(profileIcon); setTempProfileColor(profileColor); setShowProfile(true); }}>
+          <button className="navbar-profile" style={{ background: profileColor }} onClick={() => setShowProfileMenu(!showProfileMenu)}>
             <span>{profileIcon}</span>
           </button>
         </nav>
+        {showProfileMenu && <ProfileMenu onClose={() => setShowProfileMenu(false)} />}
         <div style={{ background: '#d0e8d2', padding: '0.5rem 1rem 0.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'white', borderRadius: '1rem', padding: '0.6rem 1rem', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
             <span className="riepilogo-icon-box" onClick={() => navigate('/')} style={{ position: 'relative', width: 36, height: 36, display: 'inline-flex', flexShrink: 0, borderRadius: '0.45rem', cursor: 'pointer' }}>

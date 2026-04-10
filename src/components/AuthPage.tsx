@@ -45,16 +45,13 @@ export default function AuthPage() {
         setError(error === 'Invalid login credentials' ? 'Credenziali non valide' : error);
       } else {
         localStorage.setItem('profile-pwd-hint', password);
-        localStorage.setItem('rate-first-login', 'true');
       }
     } else {
-      const { error } = await signUp(email, password);
+      const { error } = await signUp(email, password, nome.trim(), cognome.trim());
       if (error) {
         setError(error);
       } else {
-        localStorage.setItem('profile-nome', nome.trim());
-        localStorage.setItem('profile-cognome', cognome.trim());
-        localStorage.setItem('profile-pwd-hint', password);
+        localStorage.setItem('rate-first-login', 'true');
         setSuccess('Account creato! Reindirizzamento...');
         setLoading(false);
         setTimeout(() => {
