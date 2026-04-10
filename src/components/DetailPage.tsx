@@ -300,6 +300,14 @@ export default function DetailPage({ financings, onUpdate }: Props) {
     return () => { document.body.style.overflow = prev; };
   }, [editingPayment]);
 
+  // Close the financing switcher dropdown on any scroll outside it
+  useEffect(() => {
+    if (!showSwitcher) return;
+    const handler = () => setShowSwitcher(false);
+    window.addEventListener('scroll', handler, true);
+    return () => window.removeEventListener('scroll', handler, true);
+  }, [showSwitcher]);
+
   const saveEditPayment = () => {
     if (!editingPayment) return;
     const val = parseFloat(`${editInt || '0'}.${editDec || '0'}`);
