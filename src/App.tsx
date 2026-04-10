@@ -10,6 +10,7 @@ import AuthPage from './components/AuthPage';
 import BottomNav from './components/BottomNav';
 import ProfilePage from './components/ProfilePage';
 import SettingsPage from './components/SettingsPage';
+import CronologiaPage from './components/CronologiaPage';
 import './App.css';
 
 function AppContent() {
@@ -131,6 +132,10 @@ function AppContent() {
         <Route
           path="/impostazioni"
           element={<SettingsPage />}
+        />
+        <Route
+          path="/cronologia"
+          element={<CronologiaPage financings={financings} />}
         />
         <Route
           path="/detail/:id"

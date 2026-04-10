@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, LogIn, Settings } from 'lucide-react';
+import { LogOut, LogIn, Settings, History, User } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 
 type Props = {
@@ -71,7 +72,7 @@ export default function ProfileMenu({ onClose, variant = 'full' }: Props) {
     transition: `transform ${ANIM_MS}ms cubic-bezier(0.4, 0, 0.2, 1), opacity ${ANIM_MS}ms ease`,
   };
 
-  return (
+  return createPortal(
     <>
       <div
         style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'transparent' }}
@@ -80,19 +81,33 @@ export default function ProfileMenu({ onClose, variant = 'full' }: Props) {
       />
       <div style={menuStyle}>
         {variant === 'settings-only' ? (
-          <button
-            onClick={() => handleNavigate('/impostazioni')}
-            style={{ width: '100%', padding: '0.7rem 1rem', border: 'none', background: 'none', textAlign: 'center', fontSize: '0.85rem', cursor: 'pointer', color: '#333', fontWeight: '500' }}
-          >
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}><Settings size={14} /> Impostazioni</span>
-          </button>
+          <>
+            <button
+              onClick={() => handleNavigate('/cronologia')}
+              style={{ width: '100%', padding: '0.7rem 1rem', border: 'none', background: 'none', textAlign: 'center', fontSize: '0.85rem', cursor: 'pointer', color: '#333', fontWeight: '500', borderBottom: '1px solid #eee' }}
+            >
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}><History size={14} /> Cronologia</span>
+            </button>
+            <button
+              onClick={() => handleNavigate('/impostazioni')}
+              style={{ width: '100%', padding: '0.7rem 1rem', border: 'none', background: 'none', textAlign: 'center', fontSize: '0.85rem', cursor: 'pointer', color: '#333', fontWeight: '500' }}
+            >
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}><Settings size={14} /> Impostazioni</span>
+            </button>
+          </>
         ) : (
           <>
             <button
               onClick={() => handleNavigate('/profilo')}
               style={{ width: '100%', padding: '0.7rem 1rem', border: 'none', background: 'none', textAlign: 'center', fontSize: '0.85rem', cursor: 'pointer', color: '#333', fontWeight: '500', borderBottom: '1px solid #eee' }}
             >
-              Profilo
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}><User size={14} /> Profilo</span>
+            </button>
+            <button
+              onClick={() => handleNavigate('/cronologia')}
+              style={{ width: '100%', padding: '0.7rem 1rem', border: 'none', background: 'none', textAlign: 'center', fontSize: '0.85rem', cursor: 'pointer', color: '#333', fontWeight: '500', borderBottom: '1px solid #eee' }}
+            >
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}><History size={14} /> Cronologia</span>
             </button>
             <button
               onClick={() => handleNavigate('/impostazioni')}
@@ -118,6 +133,7 @@ export default function ProfileMenu({ onClose, variant = 'full' }: Props) {
           </>
         )}
       </div>
-    </>
+    </>,
+    document.body
   );
 }

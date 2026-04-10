@@ -668,7 +668,7 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
               <button
                 className="toolbar-btn"
                 onClick={() => setShowSortMenu(!showSortMenu)}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', width: 50, height: 42, padding: 0, boxSizing: 'border-box' }}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', width: 50, height: 42, padding: 0, boxSizing: 'border-box', background: 'white' }}
                 title="Ordinamento"
               >
                 {sortMode === 'default' && <span style={{ fontSize: '0.7rem', fontWeight: 'bold', whiteSpace: 'nowrap' }}>A-Z</span>}
@@ -726,10 +726,10 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
             {!showSearch && (searchQuery || filterType !== 'tutti' || filterRateMode !== 'tutti') && (
               <button
                 onClick={() => { setSearchQuery(''); setFilterType('tutti'); setFilterRateMode('tutti'); }}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#c0392b', border: 'none', borderRadius: '0.75rem', cursor: 'pointer', padding: '0.5rem 0.85rem', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'white', border: '1.5px solid #e74c3c', borderRadius: '0.75rem', cursor: 'pointer', padding: '0.5rem 0.85rem', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
                 title="Reset filtri"
               >
-                <X size={18} color="white" />
+                <X size={18} color="#e74c3c" />
               </button>
             )}
           </div>
@@ -918,7 +918,7 @@ export default function HomePage({ financings, onAdd, onDelete, onUpdate }: Prop
                         navigate(`/detail/${f.id}`);
                       }}
                       className="riepilogo-icon-box"
-                      style={{ background: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '26px', height: '26px', boxSizing: 'border-box', lineHeight: 0, position: 'relative', transform: 'translateY(0.5px)' }}
+                      style={{ background: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '26px', height: '26px', boxSizing: 'border-box', lineHeight: 0, position: 'relative', transform: 'translateY(1.5px)' }}
                       title="Apri dettaglio"
                     >
                       <AppsListDetail24Regular style={{ fontSize: 15, color: '#2ecc71', position: 'absolute', clipPath: 'inset(0 0 50% 0)' }} />
